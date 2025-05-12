@@ -1,27 +1,24 @@
 require('dotenv').config();
 const express = require('express');
 const app = express();
-const multer = require('multer');
+const cors = require('cors');
 const path = require('path');
 const clienteRoutes = require('./routes/clientesRoutes');
+const authRoutes = require('./routes/authRoutes');
+const uploadsRoutes = require('./routes/uploadsRoutes');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Middleware para parsear JSON
 app.use(express.json());
 
-// Configurar almacenamiento de Multer
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Configurar carpeta donde se guardarán los archivos
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    // Cambiar el nombre del archivo para evitar conflictos
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
-});
 
-// Configuración de multer
-const upload = multer({ storage: storage });
+app.use(cors({
+  origin: "http://127.0.0.1:5501", // Debes usar el frontend correcto
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true  // 🛑 Habilita las cookies en CORS
+}));
+
 
 // Middleware para aceptar multipart/form-data
 app.use(express.urlencoded({ extended: true }));
@@ -32,8 +29,12 @@ app.get('/', (req, res) => {
   res.send('API conectada correctamente');
 });
 
-// Rutas del módulo cliente
+
 app.use('/api', clienteRoutes);
+app.use('/auth', authRoutes);
+app.use('/api', uploadsRoutes);
+
+
 
 // Iniciar servidor
 const PORT = process.env.PORT || 3000;
