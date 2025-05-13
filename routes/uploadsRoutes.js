@@ -4,57 +4,37 @@ const path = require('path');
 const fs = require('fs');
 const router = express.Router();
 
-// Configuración de almacenamiento mejorada
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const tipo = req.body.tipo || 'temp';
-        const uploadPath = path.join(__dirname, '..', 'uploads', tipo);
-
-        // Crear directorio si no existe
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-        }
-
-        cb(null, uploadPath);
-    },
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        const filename = `${file.fieldname}-${Date.now()}${ext}`;
-        cb(null, filename);
-    }
-});
-
-// Filtro de tipos de archivo
-const fileFilter = (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-    if (allowedTypes.includes(file.mimetype)) {
-        cb(null, true);
-    } else {
-        cb(new Error('Tipo de archivo no permitido. Solo se aceptan JPG, PNG o PDF.'), false);
-    }
-};
-
-// Configuración de Multer
+// Primero: usa memoryStorage para leer todo el form-data (incluyendo tipo y cedula)
 const upload = multer({
-    storage: storage,
-    fileFilter: fileFilter,
+    storage: multer.memoryStorage(),
     limits: {
         fileSize: 5 * 1024 * 1024 // 5MB
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Tipo de archivo no permitido. Solo JPG, PNG o PDF.'), false);
+        }
     }
-}).single('file'); // Usamos .single() ya que subiremos un archivo a la vez
+}).single('file');
 
-// Ruta POST /api/upload (porque en server.js usas app.use('/api', uploadsRoutes))
 router.post('/upload', (req, res) => {
-    upload(req, res, async (err) => {
+    upload(req, res, (err) => {
         try {
-            // Manejar errores de Multer
-            if (err instanceof multer.MulterError) {
-                throw new Error(`Error al subir archivo: ${err.message}`);
-            } else if (err) {
-                throw err;
+            if (err instanceof multer.MulterError) throw new Error(`Multer error: ${err.message}`);
+            if (err) throw err;
+
+            const { tipo, cedula } = req.body;
+
+            if (!tipo || !cedula) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Faltan datos requeridos: tipo o cedula'
+                });
             }
 
-            // Verificar si se subió un archivo
             if (!req.file) {
                 return res.status(400).json({
                     success: false,
@@ -62,22 +42,34 @@ router.post('/upload', (req, res) => {
                 });
             }
 
-            // Construir la URL pública del archivo
-            const fileUrl = `/uploads/${req.body.tipo || 'temp'}/${req.file.filename}`;
+            const ext = path.extname(req.file.originalname);
+            const fileName = `${tipo}-${cedula}${ext}`;
+            const destFolder = path.join(__dirname, '..', 'uploads', tipo);
 
-            res.json({
+            if (!fs.existsSync(destFolder)) {
+                fs.mkdirSync(destFolder, { recursive: true });
+            }
+
+            const finalPath = path.join(destFolder, fileName);
+
+            // Guarda el archivo desde memoria al disco
+            fs.writeFileSync(finalPath, req.file.buffer);
+
+            const fileUrl = `/uploads/${tipo}/${fileName}`;
+
+            return res.json({
                 success: true,
                 url: fileUrl,
-                filename: req.file.filename,
+                filename: fileName,
                 originalname: req.file.originalname,
                 size: req.file.size
             });
 
         } catch (error) {
             console.error('Error en la subida:', error);
-            res.status(500).json({
+            return res.status(500).json({
                 success: false,
-                message: error.message || 'Error al procesar el archivo'
+                message: error.message
             });
         }
     });

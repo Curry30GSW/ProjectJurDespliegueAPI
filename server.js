@@ -6,7 +6,7 @@ const path = require('path');
 const clienteRoutes = require('./routes/clientesRoutes');
 const authRoutes = require('./routes/authRoutes');
 const uploadsRoutes = require('./routes/uploadsRoutes');
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 
 // Middleware para parsear JSON
 app.use(express.json());
@@ -29,7 +29,8 @@ app.get('/', (req, res) => {
   res.send('API conectada correctamente');
 });
 
-
+// Middleware para servir imágenes estáticas desde /uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api', clienteRoutes);
 app.use('/auth', authRoutes);
 app.use('/api', uploadsRoutes);
