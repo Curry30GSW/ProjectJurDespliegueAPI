@@ -90,6 +90,14 @@ const ClienteController = {
         bodyReceived: req.body
       });
 
+      // Si el error es por cédula duplicada
+      if (err.message.includes('Ya existe un cliente con esa cédula')) {
+        return res.status(400).json({
+          success: false,
+          message: err.message // Esto se mostrará en el frontend
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: 'Error al procesar la solicitud',
@@ -97,7 +105,25 @@ const ClienteController = {
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
       });
     }
+
+  },
+
+  buscarClientePorCedula: async (req, res) => {
+    try {
+      const cedula = req.params.cedula;
+      const cliente = await ClienteModel.buscarPorCedula(cedula);
+
+      if (cliente) {
+        res.json(cliente);
+      } else {
+        res.status(404).json({ mensaje: 'Cliente no encontrado' });
+      }
+    } catch (error) {
+      console.error('Error al buscar cliente por cédula:', error);
+      res.status(500).json({ mensaje: 'Error en el servidor' });
+    }
   }
 };
+
 
 module.exports = ClienteController;

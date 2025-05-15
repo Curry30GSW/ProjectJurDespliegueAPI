@@ -1,3 +1,4 @@
+const ClienteModel = require('../models/clientesModel');
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
@@ -21,7 +22,7 @@ const upload = multer({
 }).single('file');
 
 router.post('/upload', (req, res) => {
-    upload(req, res, (err) => {
+    upload(req, res, async (err) => { // <-- nota el "async" agregado aquí
         try {
             if (err instanceof multer.MulterError) throw new Error(`Multer error: ${err.message}`);
             if (err) throw err;
@@ -32,6 +33,15 @@ router.post('/upload', (req, res) => {
                 return res.status(400).json({
                     success: false,
                     message: 'Faltan datos requeridos: tipo o cedula'
+                });
+            }
+
+            // 🔍 Verificar si ya existe el cliente con esa cédula
+            const clienteExistente = await ClienteModel.buscarPorCedula(cedula);
+            if (clienteExistente) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Ya existe un cliente con esa cédula. No se permite subir archivo.'
                 });
             }
 
@@ -52,7 +62,6 @@ router.post('/upload', (req, res) => {
 
             const finalPath = path.join(destFolder, fileName);
 
-            // Guarda el archivo desde memoria al disco
             fs.writeFileSync(finalPath, req.file.buffer);
 
             const fileUrl = `/uploads/${tipo}/${fileName}`;
@@ -74,5 +83,6 @@ router.post('/upload', (req, res) => {
         }
     });
 });
+
 
 module.exports = router;
