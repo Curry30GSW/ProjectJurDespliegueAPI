@@ -22,7 +22,7 @@ const upload = multer({
 }).single('file');
 
 router.post('/upload', (req, res) => {
-    upload(req, res, async (err) => { // <-- nota el "async" agregado aquí
+    upload(req, res, async (err) => {
         try {
             if (err instanceof multer.MulterError) throw new Error(`Multer error: ${err.message}`);
             if (err) throw err;

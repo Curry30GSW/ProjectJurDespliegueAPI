@@ -1,5 +1,38 @@
 const pool = require('../config/db');
 
+async function handleReferencias(connection, id_cliente, tableName, referencias, valueMapper, fields) {
+  if (!referencias || referencias.length === 0) return;
+
+  const [existingRefs] = await connection.query(
+    `SELECT * FROM ${tableName} WHERE id_cliente = ?`,
+    [id_cliente]
+  );
+
+  for (const ref of referencias) {
+    if (ref.id_referencia) {
+      await connection.query(
+        `UPDATE ${tableName} SET ${fields.slice(1).map(f => `${f} = ?`).join(', ')} 
+         WHERE id_referencia = ?`,
+        [...valueMapper(ref).slice(1), ref.id_referencia]
+      );
+    } else {
+      await connection.query(
+        `INSERT INTO ${tableName} (${fields.join(', ')}) VALUES (${fields.map(() => '?').join(', ')})`,
+        valueMapper(ref)
+      );
+    }
+  }
+
+  const currentIds = referencias.filter(r => r.id_referencia).map(r => r.id_referencia);
+  if (existingRefs.length > 0) {
+    await connection.query(
+      `DELETE FROM ${tableName} WHERE id_cliente = ? AND id_referencia NOT IN (${currentIds.length > 0 ? currentIds.join(',') : '0'})`,
+      [id_cliente]
+    );
+  }
+}
+
+
 const ClienteModel = {
 
   getAllClientes: async () => {
@@ -25,12 +58,13 @@ const ClienteModel = {
 
       // Insertar cliente principal
       const clienteQuery = `
-            INSERT INTO clientes (
-                nombres, apellidos, cedula, cedula_pdf, direccion, telefono, sexo, fecha_nac,
-                edad, ciudad, correo, barrio, estado_civil, laboral, empresa, cargo, pagaduria, 
-                salario, desprendible, bienes, datacred, asesor, foto_perfil
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
+        INSERT INTO clientes (
+            nombres, apellidos, cedula, cedula_pdf, direccion, telefono, sexo, fecha_nac,
+            edad, ciudad, correo, barrio, estado_civil, laboral, empresa, cargo, pagaduria, 
+            salario, desprendible, bienes, datacred, asesor, foto_perfil, 
+            data_credPdf, bienes_inmuebles  
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
 
       const clienteValues = [
         clienteData.nombres || null,
@@ -52,10 +86,12 @@ const ClienteModel = {
         clienteData.pagaduria || 'NO APLICA',
         clienteData.salario ? parseInt(clienteData.salario) : null,
         clienteData.desprendible || null,
-        clienteData.bienes_inmuebles === 'si' ? 1 : 0,
+        clienteData.bienes === 'si' ? 1 : 0,
         clienteData.data_credito === 'si' ? 1 : 0,
         clienteData.asesor || null,
-        clienteData.foto_perfil || null
+        clienteData.foto_perfil || null,
+        clienteData.data_credPdf || null,
+        clienteData.bienes_inmuebles || null
       ];
 
       const [result] = await connection.query(clienteQuery, clienteValues);
@@ -136,7 +172,7 @@ const ClienteModel = {
     try {
       await connection.beginTransaction();
 
-      // Buscar ID del cliente a partir de la cédula
+      // Buscar ID del cliente
       const [rows] = await connection.query(
         'SELECT id_cliente FROM clientes WHERE cedula = ?',
         [cedula]
@@ -148,72 +184,56 @@ const ClienteModel = {
 
       const id_cliente = rows[0].id_cliente;
 
-      // Actualizar cliente principal
-      const updateQuery = `
-      UPDATE clientes SET 
-        nombres = ?, 
-        apellidos = ?, 
-        telefono = ?, 
-        correo = ?, 
-        direccion = ?,  
-        ciudad = ?, 
-        barrio = ?, 
-        estado = ?, 
-        laboral = ?, 
-        empresa = ?, 
-        cargo = ?, 
-        pagaduria = ?, 
-        salario = ?, 
-        desprendible = ?, 
-        bienes = ?, 
-        datacred = ?, 
-        foto_perfil = ?
-      WHERE cedula = ?
-    `;
+      // Construir consulta dinámica para actualizar solo los campos proporcionados
+      const fieldsToUpdate = [];
+      const valuesToUpdate = [];
 
-      const updateValues = [
-        clienteData.nombres || null,
-        clienteData.apellidos || null,
-        clienteData.direccion || null,
-        clienteData.telefono || null,
-        clienteData.sexo || null,
-        clienteData.fechaNacimiento || null,
-        clienteData.edad ? parseInt(clienteData.edad) : null,
-        clienteData.ciudad || null,
-        clienteData.correo || null,
-        clienteData.barrio || null,
-        clienteData.estado_civil || null,
-        clienteData.laboral || 'NO APLICA',
-        clienteData.empresa || 'NO APLICA',
-        clienteData.cargo || 'NO APLICA',
-        clienteData.pagaduria || 'NO APLICA',
-        clienteData.salario ? parseInt(clienteData.salario) : null,
-        clienteData.desprendible || null,
-        clienteData.bienes_inmuebles === 'si' ? 1 : 0,
-        clienteData.data_credito === 'si' ? 1 : 0,
-        clienteData.foto_perfil || null,
-        parseInt(cedula)
-      ];
+      // Mapeo de campos
+      const fieldMap = {
+        nombres: clienteData.nombres,
+        apellidos: clienteData.apellidos,
+        telefono: clienteData.telefono,
+        correo: clienteData.correo,
+        direccion: clienteData.direccion,
+        ciudad: clienteData.ciudad,
+        barrio: clienteData.barrio,
+        estado: clienteData.estado_civil,
+        laboral: clienteData.laboral || 'NO APLICA',
+        empresa: clienteData.empresa || 'NO APLICA',
+        cargo: clienteData.cargo || 'NO APLICA',
+        pagaduria: clienteData.pagaduria || 'NO APLICA',
+        salario: clienteData.salario ? parseInt(clienteData.salario) : null,
+        desprendible: clienteData.desprendible,
+        bienes: clienteData.bienes_inmuebles === 'si' ? 1 : 0,
+        datacred: clienteData.data_credito === 'si' ? 1 : 0,
+        foto_perfil: clienteData.foto_perfil,
+        cedula_pdf: clienteData.cedula_pdf
+      };
 
-      await connection.query(updateQuery, updateValues);
-
-      // Eliminar y volver a insertar referencias personales
-      await connection.query('DELETE FROM referencias_personales WHERE id_cliente = ?', [id_cliente]);
-      for (const ref of clienteData.referencias_personales) {
-        await connection.query(
-          `INSERT INTO referencias_personales (id_cliente, personal_nombre, personal_telefono) VALUES (?, ?, ?)`,
-          [id_cliente, ref.personal_nombre, ref.personal_telefono]
-        );
+      // Construir partes de la consulta dinámicamente
+      for (const [field, value] of Object.entries(fieldMap)) {
+        if (value !== undefined && value !== null) {
+          fieldsToUpdate.push(`${field} = ?`);
+          valuesToUpdate.push(value);
+        }
       }
 
-      // Eliminar y volver a insertar referencias familiares
-      await connection.query('DELETE FROM referencias_familiares WHERE id_cliente = ?', [id_cliente]);
-      for (const ref of clienteData.referencias_familiares) {
-        await connection.query(
-          `INSERT INTO referencias_familiares (id_cliente, familia_nombre, familia_telefono, parentesco) VALUES (?, ?, ?, ?)`,
-          [id_cliente, ref.familia_nombre, ref.familia_telefono, ref.parentesco]
-        );
+      // Solo actualizar si hay campos para actualizar
+      if (fieldsToUpdate.length > 0) {
+        const updateQuery = `UPDATE clientes SET ${fieldsToUpdate.join(', ')} WHERE cedula = ?`;
+        await connection.query(updateQuery, [...valuesToUpdate, parseInt(cedula)]);
       }
+
+      // Manejo de referencias (mejorado)
+      await handleReferencias(connection, id_cliente, 'referencias_personales', clienteData.referencias_personales,
+        (ref) => [id_cliente, ref.personal_nombre, ref.personal_telefono],
+        ['id_cliente', 'personal_nombre', 'personal_telefono']
+      );
+
+      await handleReferencias(connection, id_cliente, 'referencias_familiares', clienteData.referencias_familiares,
+        (ref) => [id_cliente, ref.familia_nombre, ref.familia_telefono, ref.parentesco],
+        ['id_cliente', 'familia_nombre', 'familia_telefono', 'parentesco']
+      );
 
       await connection.commit();
       return { message: 'Cliente actualizado exitosamente' };
@@ -225,7 +245,7 @@ const ClienteModel = {
     }
   },
 
-
 };
+
 
 module.exports = ClienteModel;
