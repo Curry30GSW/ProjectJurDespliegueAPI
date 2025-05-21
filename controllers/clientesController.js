@@ -44,6 +44,7 @@ const ClienteController = {
         laboral = parseInt(req.body.laboral) === 1 ? 1 : 0;
       }
 
+
       // 3. Validación de campos numéricos
       const salario = parseInt(req.body.ingresos?.toString().replace(/\D/g, '')) || 0;
 
@@ -122,7 +123,13 @@ const ClienteController = {
   },
 
   actualizarCliente: async (req, res) => {
+    const clienteData = req.body;
+
     const { cedula } = req.params;
+    if (req.body.salario) {
+      clienteData.salario = req.body.salario
+        .replace(/[^\d]/g, ''); // Elimina $, puntos y espacios
+    }
 
     try {
       // Función mejorada para parsear referencias
@@ -157,12 +164,22 @@ const ClienteController = {
       // Manejar archivos
       if (req.files) {
         if (req.files['foto_perfil']?.[0]) {
-          clienteData.foto_perfil = req.files['foto_perfil'][0].buffer;
+          clienteData.foto_perfil = req.files['foto_perfil'][0].path;
         }
         if (req.files['cedula_pdf']?.[0]) {
-          clienteData.cedula_pdf = req.files['cedula_pdf'][0].buffer;
+          clienteData.cedula_pdf = req.files['cedula_pdf'][0].path;
+        }
+        if (req.files['desprendible_pago']?.[0]) {
+          clienteData.desprendible = req.files['desprendible_pago'][0].path;
+        }
+        if (req.files['data_credito']?.[0]) {
+          clienteData.data_credito_archivo = req.files['data_credito'][0].path;
+        }
+        if (req.files['bienes_inmuebles[]']) {
+          clienteData.bienes_rutas = req.files['bienes_inmuebles[]'].map(file => file.path);
         }
       }
+
 
       // Convertir campos booleanos
       if (req.body.bienes_inmuebles !== undefined) {

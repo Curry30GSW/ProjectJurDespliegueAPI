@@ -1,36 +1,30 @@
 const pool = require('../config/db');
 
-async function handleReferencias(connection, id_cliente, tableName, referencias, valueMapper, fields) {
-  if (!referencias || referencias.length === 0) return;
+async function handleReferencias(connection, id_cliente, tabla, referencias, getValuesFn, columnas, idField) {
+  if (!Array.isArray(referencias)) return;
 
-  const [existingRefs] = await connection.query(
-    `SELECT * FROM ${tableName} WHERE id_cliente = ?`,
-    [id_cliente]
-  );
+  for (const referencia of referencias) {
+    const id_referencia = referencia[idField];
 
-  for (const ref of referencias) {
-    if (ref.id_referencia) {
+    // Si existe el id_referencia, actualiza
+    if (id_referencia) {
+      const campos = columnas.map(col => `${col} = ?`).join(', ');
+      const valores = getValuesFn(referencia);
       await connection.query(
-        `UPDATE ${tableName} SET ${fields.slice(1).map(f => `${f} = ?`).join(', ')} 
-         WHERE id_referencia = ?`,
-        [...valueMapper(ref).slice(1), ref.id_referencia]
+        `UPDATE ${tabla} SET ${campos} WHERE ${idField} = ?`,
+        [...valores, id_referencia]
       );
     } else {
+      // Si no existe, inserta nuevo
+      const valores = getValuesFn(referencia);
       await connection.query(
-        `INSERT INTO ${tableName} (${fields.join(', ')}) VALUES (${fields.map(() => '?').join(', ')})`,
-        valueMapper(ref)
+        `INSERT INTO ${tabla} (${columnas.join(', ')}) VALUES (${columnas.map(() => '?').join(', ')})`,
+        valores
       );
     }
   }
-
-  const currentIds = referencias.filter(r => r.id_referencia).map(r => r.id_referencia);
-  if (existingRefs.length > 0) {
-    await connection.query(
-      `DELETE FROM ${tableName} WHERE id_cliente = ? AND id_referencia NOT IN (${currentIds.length > 0 ? currentIds.join(',') : '0'})`,
-      [id_cliente]
-    );
-  }
 }
+
 
 
 const ClienteModel = {
@@ -225,23 +219,37 @@ const ClienteModel = {
       }
 
       // Manejo de referencias (mejorado)
-      await handleReferencias(connection, id_cliente, 'referencias_personales', clienteData.referencias_personales,
+      await handleReferencias(
+        connection,
+        id_cliente,
+        'referencias_personales',
+        clienteData.referencias_personales,
         (ref) => [id_cliente, ref.personal_nombre, ref.personal_telefono],
-        ['id_cliente', 'personal_nombre', 'personal_telefono']
+        ['id_cliente', 'personal_nombre', 'personal_telefono'],
+        'id_referenciaPe'
       );
 
-      await handleReferencias(connection, id_cliente, 'referencias_familiares', clienteData.referencias_familiares,
+      await handleReferencias(
+        connection,
+        id_cliente,
+        'referencias_familiares',
+        clienteData.referencias_familiares,
         (ref) => [id_cliente, ref.familia_nombre, ref.familia_telefono, ref.parentesco],
-        ['id_cliente', 'familia_nombre', 'familia_telefono', 'parentesco']
+        ['id_cliente', 'familia_nombre', 'familia_telefono', 'parentesco'],
+        'id_referenciaFa'
       );
 
       await connection.commit();
       return { message: 'Cliente actualizado exitosamente' };
     } catch (error) {
-      await connection.rollback();
+      try {
+        if (connection) await connection.rollback();
+      } catch (rollbackError) {
+        console.error('Error durante rollback:', rollbackError.message);
+      }
       throw error;
     } finally {
-      connection.release();
+      if (connection) connection.release();
     }
   },
 
