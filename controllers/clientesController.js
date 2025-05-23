@@ -164,20 +164,21 @@ const ClienteController = {
       // Manejar archivos
       if (req.files) {
         if (req.files['foto_perfil']?.[0]) {
-          clienteData.foto_perfil = req.files['foto_perfil'][0].path;
+          clienteData.foto_perfil = '/uploads/fotoPerfil/' + req.files['foto_perfil'][0].filename;
         }
         if (req.files['cedula_pdf']?.[0]) {
-          clienteData.cedula_pdf = req.files['cedula_pdf'][0].path;
+          clienteData.cedula_pdf = '/uploads/cedulaPdf/' + req.files['cedula_pdf'][0].filename;
         }
         if (req.files['desprendible_pago']?.[0]) {
-          clienteData.desprendible = req.files['desprendible_pago'][0].path;
+          clienteData.desprendible = '/uploads/desprendible/' + req.files['desprendible_pago'][0].filename;
         }
         if (req.files['data_credito']?.[0]) {
-          clienteData.data_credito_archivo = req.files['data_credito'][0].path;
+          clienteData.data_credito_archivo = '/uploads/dataCredito/' + req.files['data_credito'][0].filename;
         }
         if (req.files['bienes_inmuebles[]']) {
-          clienteData.bienes_rutas = req.files['bienes_inmuebles[]'].map(file => file.path);
+          clienteData.bienes_rutas = req.files['bienes_inmuebles[]'].map(file => '/uploads/bienesInmuebles/' + file.filename);
         }
+
       }
 
 

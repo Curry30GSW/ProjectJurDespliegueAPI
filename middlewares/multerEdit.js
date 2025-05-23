@@ -4,7 +4,7 @@ const multer = require('multer');
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         let folder = 'uploads/otros';
-        if (file.fieldname === 'foto_perfil') folder = 'uploads/fotosPerfil';
+        if (file.fieldname === 'foto_perfil') folder = 'uploads/fotoPerfil';
         if (file.fieldname === 'cedula_pdf') folder = 'uploads/cedulaPdf';
         if (file.fieldname === 'desprendible_pago') folder = 'uploads/desprendible';
         if (file.fieldname === 'data_credito') folder = 'uploads/dataCredito';

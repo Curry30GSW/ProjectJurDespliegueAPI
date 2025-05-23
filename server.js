@@ -6,6 +6,7 @@ const path = require('path');
 const clienteRoutes = require('./routes/clientesRoutes');
 const authRoutes = require('./routes/authRoutes');
 const uploadsRoutes = require('./routes/uploadsRoutes');
+const dataCreditoRoutes = require('./routes/dataCreditoRoutes');
 
 
 // Middleware para parsear JSON
@@ -34,6 +35,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api', clienteRoutes);
 app.use('/auth', authRoutes);
 app.use('/api', uploadsRoutes);
+app.use('/api', dataCreditoRoutes);
 
 
 

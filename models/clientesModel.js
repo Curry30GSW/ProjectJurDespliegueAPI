@@ -90,7 +90,10 @@ const ClienteModel = {
 
       const [result] = await connection.query(clienteQuery, clienteValues);
       const id_cliente = result.insertId;
-
+      await connection.query(
+        `INSERT INTO datacredito (id_cliente, nombreData) VALUES (?, ?)`,
+        [id_cliente, '']
+      );
       // Insertar referencias personales
       for (const ref of clienteData.referencias_personales) {
         await connection.query(
