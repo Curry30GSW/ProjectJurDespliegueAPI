@@ -16,6 +16,7 @@ const dataCreditoController = {
     subirDocumento: async (req, res) => {
         try {
             const cedula = req.body.cedula;
+            const usuario = req.body.usuario;
 
             if (!req.file) {
                 return res.status(400).json({ message: 'No se adjuntó ningún archivo.' });
@@ -27,16 +28,33 @@ const dataCreditoController = {
             const fechaAdjunto = fechaLocal.toISOString().slice(0, 19).replace('T', ' ');
 
 
-            await dataCreditoModel.saveDocumentData(cedula, rutaDocumento, fechaAdjunto);
+            await dataCreditoModel.saveDocumentData(cedula, rutaDocumento, fechaAdjunto, usuario);
 
             res.status(200).json({ message: 'Documento guardado correctamente.' });
         } catch (error) {
             console.error('Error en subirDocumento:', error);
             res.status(500).json({ message: 'Error al guardar el documento.' });
         }
+    },
+
+    moverArea: async (req, res) => {
+        try {
+            const cedula = req.body.cedula;
+            const nuevaArea = req.body.area;
+            const usuario = req.body.usuario;
+
+            if (!cedula || !nuevaArea || !usuario) {
+                return res.status(400).json({ message: 'Faltan datos requeridos.' });
+            }
+
+            await dataCreditoModel.moverAreaCliente(cedula, nuevaArea, usuario);
+
+            res.status(200).json({ message: 'Área actualizada correctamente.' });
+        } catch (error) {
+            console.error('Error en moverArea:', error);
+            res.status(500).json({ message: 'Error al mover de área.' });
+        }
     }
-
-
 
 };
 
