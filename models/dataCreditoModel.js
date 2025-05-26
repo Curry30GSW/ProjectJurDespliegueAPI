@@ -50,38 +50,74 @@ const dataCreditoModel = {
     },
 
     moveAreaClient: async (cedula, nuevaArea, usuario) => {
-        const cliente = await db.query('SELECT id_cliente FROM clientes WHERE cedula = ?', [cedula]);
+        try {
+            // Buscar al cliente por cédula
+            const [clientes] = await pool.query('SELECT id_cliente FROM clientes WHERE cedula = ?', [cedula]);
 
-        if (cliente.length === 0) {
-            throw new Error('No se encontró un cliente con esa cédula.');
+            if (clientes.length === 0) {
+                throw new Error('No se encontró un cliente con esa cédula.');
+            }
+
+            const idCliente = clientes[0].id_cliente;
+
+            const ahora = new Date();
+            const fecha = new Date(ahora.getTime() - 5 * 60 * 60 * 1000)
+                .toISOString().slice(0, 19).replace('T', ' ');
+
+            // Verifica si ya existe un registro en datacredito para ese cliente
+            const [existeData] = await pool.query('SELECT id_cliente FROM datacredito WHERE id_cliente = ?', [idCliente]);
+
+            if (existeData.length === 0) {
+                await pool.query(`
+                INSERT INTO datacredito (nombreData, id_cliente, fecha_data, usuario_data, area_actual)
+                VALUES (?, ?, ?, ?, ?)
+            `, ['Cambio de área', idCliente, fecha, usuario, nuevaArea]);
+            }
+
+            await pool.query(`
+            UPDATE datacredito SET area_actual = ? WHERE id_cliente = ?
+        `, [nuevaArea, idCliente]);
+
+            // 👉 Normalizamos el valor para asegurar coincidencia
+            const area = nuevaArea.trim().toUpperCase();
+
+            // Insertar en la tabla correspondiente según el área
+            if (area === 'CREDITOS') {
+                await pool.query('INSERT INTO creditos (id_cliente) VALUES (?)', [idCliente]);
+            } else if (area === 'EMBARGOS') {
+                await pool.query('INSERT INTO embargos (id_cliente) VALUES (?)', [idCliente]);
+            } else if (area === 'INSOLVENCIAS') {
+                await pool.query('INSERT INTO insolvencia (id_cliente) VALUES (?)', [idCliente]);
+            }
+
+            // Obtener nombre del cliente para mostrarlo en notificación
+            const [datosCliente] = await pool.query('SELECT nombres FROM clientes WHERE id_cliente = ?', [idCliente]);
+            const nombreCliente = datosCliente.length > 0 ? datosCliente[0].nombres : 'Cliente';
+
+            // Guardar en historial
+            await pool.query(`
+            INSERT INTO historial_movimientos (id_cliente, nombre_cliente, area_destino, usuario, fecha_movimiento)
+            VALUES (?, ?, ?, ?, ?)
+        `, [idCliente, nombreCliente, area, usuario, fecha]);
+
+            return nombreCliente;
+
+        } catch (error) {
+            console.error('Error en moverArea:', error);
+            throw error;
         }
+    },
 
-        const idCliente = cliente[0].id_cliente;
-        const ahora = new Date();
-        const fecha = new Date(ahora.getTime() - 5 * 60 * 60 * 1000)
-            .toISOString().slice(0, 19).replace('T', ' ');
-
-        // Insertar en la tabla datacredito
-        await db.query(`
-        INSERT INTO datacredito (nombreData, id_cliente, fecha_data, usuario_data, area_actual)
-        VALUES (?, ?, ?, ?, ?)
-    `, ['Cambio de área', idCliente, fecha, usuario, nuevaArea]);
-
-        // Actualizar el campo "area" en la tabla clientes
-        await db.query(`
-        UPDATE clientes SET area = ? WHERE id_cliente = ?
-    `, [nuevaArea, idCliente]);
-
-        // Insertar en la tabla correspondiente según el área
-        if (nuevaArea === 'Creditos' || nuevaArea === 'Créditos' || nuevaArea === 'créditos') {
-            await db.query('INSERT INTO creditos (id_cliente) VALUES (?)', [idCliente]);
-        } else if (nuevaArea === 'Embargos') {
-            await db.query('INSERT INTO embargos (id_cliente) VALUES (?)', [idCliente]);
-        } else if (nuevaArea === 'Insolvencia') {
-            await db.query('INSERT INTO insolvencia (id_cliente) VALUES (?)', [idCliente]);
-        }
+    obtenerUltimasNotificaciones: async () => {
+        const [resultados] = await pool.query(`
+            SELECT nombre_cliente, area_destino, usuario, 
+                   DATE_FORMAT(fecha_movimiento, '%d %b %h:%i %p') AS fecha_formateada
+            FROM historial_movimientos
+            ORDER BY fecha_movimiento DESC
+            LIMIT 5
+        `);
+        return resultados;
     }
-
 };
 
 

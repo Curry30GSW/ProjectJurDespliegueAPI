@@ -53,4 +53,8 @@ router.post('/subir-documento', upload.single('file'), async (req, res) => {
 
 router.post('/mover-area', dataCreditoController.moverArea);
 
+
+router.get('/notificaciones', dataCreditoController.notificaciones);
+
+
 module.exports = router;
