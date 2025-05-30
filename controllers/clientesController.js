@@ -1,5 +1,6 @@
 const ClienteModel = require('../models/clientesModel');
-
+const fs = require('fs');
+const path = require('path');
 
 const ClienteController = {
 
@@ -47,6 +48,10 @@ const ClienteController = {
 
       // 3. Validación de campos numéricos
       const salario = parseInt(req.body.ingresos?.toString().replace(/\D/g, '')) || 0;
+
+      if (req.files?.['data_credito']?.[0]) {
+        req.body.data_credPdf = '/uploads/dataCredito/' + req.files['data_credito'][0].filename;
+      }
 
       // 4. Construcción segura del objeto cliente (parte corregida)
       const clienteData = {
@@ -123,16 +128,9 @@ const ClienteController = {
   },
 
   actualizarCliente: async (req, res) => {
-    const clienteData = req.body;
-
-    const { cedula } = req.params;
-    if (req.body.salario) {
-      clienteData.salario = req.body.salario
-        .replace(/[^\d]/g, ''); // Elimina $, puntos y espacios
-    }
 
     try {
-      // Función mejorada para parsear referencias
+      const { cedula } = req.params;
       const parseReferences = (field) => {
         try {
           if (!req.body[field]) return [];
@@ -154,12 +152,17 @@ const ClienteController = {
         }
       };
 
-      // Construir objeto clienteData
       const clienteData = {
         ...req.body,
         referencias_familiares: parseReferences('referencias_familiares'),
         referencias_personales: parseReferences('referencias_personales')
       };
+
+
+      if (req.body.salario) {
+        clienteData.salario = req.body.salario
+          .replace(/[^\d]/g, ''); // Elimina $, puntos y espacios
+      }
 
       // Manejar archivos
       if (req.files) {
@@ -178,7 +181,6 @@ const ClienteController = {
         if (req.files['bienes_inmuebles[]']) {
           clienteData.bienes_rutas = req.files['bienes_inmuebles[]'].map(file => '/uploads/bienesInmuebles/' + file.filename);
         }
-
       }
 
 
@@ -206,6 +208,7 @@ const ClienteController = {
     }
   }
 };
+
 
 
 module.exports = ClienteController;

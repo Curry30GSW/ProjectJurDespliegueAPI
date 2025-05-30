@@ -2,7 +2,6 @@ const dataCreditoModel = require('../models/dataCreditoModel');
 
 const dataCreditoController = {
 
-    // Listar todos los clientes con su información de DataCrédito
     listarClientesConDataCredito: async (req, res) => {
         try {
             const clientes = await dataCreditoModel.getAllClienteData();

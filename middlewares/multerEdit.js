@@ -1,5 +1,6 @@
 const path = require('path');
 const multer = require('multer');
+const fs = require('fs');
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -10,7 +11,11 @@ const storage = multer.diskStorage({
         if (file.fieldname === 'data_credito') folder = 'uploads/dataCredito';
         if (file.fieldname === 'bienes_inmuebles[]') folder = 'uploads/bienesInmuebles';
 
-        const absolutePath = path.resolve(folder); // ✅
+        const absolutePath = path.resolve(folder);
+        if (!fs.existsSync(absolutePath)) {
+            fs.mkdirSync(absolutePath, { recursive: true }); // ← estaba mal escrito (te faltó `true`)
+
+        }
         cb(null, absolutePath);
     },
     filename: (req, file, cb) => {

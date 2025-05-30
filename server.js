@@ -7,7 +7,11 @@ const clienteRoutes = require('./routes/clientesRoutes');
 const authRoutes = require('./routes/authRoutes');
 const uploadsRoutes = require('./routes/uploadsRoutes');
 const dataCreditoRoutes = require('./routes/dataCreditoRoutes');
+const insolvenciasRoutes = require('./routes/insolvenciasRoutes')
+const methodOverride = require('method-override');
 
+
+app.use(methodOverride('_method'));
 
 // Middleware para parsear JSON
 app.use(express.json());
@@ -36,7 +40,7 @@ app.use('/api', clienteRoutes);
 app.use('/auth', authRoutes);
 app.use('/api', uploadsRoutes);
 app.use('/api', dataCreditoRoutes);
-
+app.use('/api', insolvenciasRoutes);
 
 
 // Iniciar servidor

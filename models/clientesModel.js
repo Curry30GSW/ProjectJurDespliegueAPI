@@ -55,9 +55,8 @@ const ClienteModel = {
         INSERT INTO clientes (
             nombres, apellidos, cedula, cedula_pdf, direccion, telefono, sexo, fecha_nac,
             edad, ciudad, correo, barrio, estado_civil, laboral, empresa, cargo, pagaduria, 
-            salario, desprendible, bienes, asesor, foto_perfil, 
-            data_credPdf, bienes_inmuebles  
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            salario, desprendible, bienes, asesor, foto_perfil, bienes_inmuebles  
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       const clienteValues = [
@@ -84,7 +83,6 @@ const ClienteModel = {
         clienteData.data_credito === 'si' ? 1 : 0,
         clienteData.asesor || null,
         clienteData.foto_perfil || null,
-        clienteData.data_credPdf || null,
         clienteData.bienes_inmuebles || null
       ];
 
@@ -194,7 +192,9 @@ const ClienteModel = {
         direccion: clienteData.direccion,
         ciudad: clienteData.ciudad,
         barrio: clienteData.barrio,
-        estado: clienteData.estado_civil,
+        estado_civil: clienteData.estado_civil,
+        estado: clienteData.estado !== undefined ? parseInt(clienteData.estado) : undefined,
+        motivo_retiro: clienteData.motivo_retiro || null, // 
         laboral: clienteData.laboral || 'NO APLICA',
         empresa: clienteData.empresa || 'NO APLICA',
         cargo: clienteData.cargo || 'NO APLICA',
