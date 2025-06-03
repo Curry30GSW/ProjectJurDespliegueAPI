@@ -8,5 +8,7 @@ const insolvenciaController = require('../controllers/insolvenciasController');
 
 router.get('/clientes-insolvencias', insolvenciaController.listarClientesConInsolvencia);
 
+router.put('/actualizar-insolvencias', insolvenciaController.actualizarInsolvencia);
+
 
 module.exports = router;
