@@ -2,7 +2,7 @@ const multer = require('multer');
 
 const uploadPDF = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB por archivo
     fileFilter: (req, file, cb) => {
         const allowedTypes = ['application/pdf'];
         if (allowedTypes.includes(file.mimetype)) {
@@ -11,6 +11,9 @@ const uploadPDF = multer({
             cb(new Error('Solo se permiten archivos PDF'), false);
         }
     }
-}).single('archivoPDF');
+}).fields([
+    { name: 'archivoPDF', maxCount: 1 },
+    { name: 'desprendiblePDFUrl', maxCount: 1 }
+]);
 
 module.exports = uploadPDF;

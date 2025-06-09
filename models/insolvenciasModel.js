@@ -34,10 +34,11 @@ const insolvenciaModel = {
     updateInsolvenciaData: async ({
         id_cliente,
         cuadernillo,
+        fecha_cuadernillo,
         radicacion,
+        fecha_radicacion,
         correcciones,
         acta_aceptacion,
-        desprendible,
         tipo_proceso,
         juzgado,
         nombre_liquidador,
@@ -51,10 +52,11 @@ const insolvenciaModel = {
         const [result] = await pool.query(`
         UPDATE insolvencia 
         SET cuadernillo = ?, 
+            fecha_cuadernillo = ?,
             radicacion = ?, 
+            fecha_radicacion = ?,
             correcciones = ?, 
             acta_aceptacion = ?, 
-            desprendible = ?, 
             tipo_proceso = ?, 
             juzgado = ?, 
             nombre_liquidador = ?, 
@@ -67,10 +69,11 @@ const insolvenciaModel = {
         WHERE id_cliente = ?
     `, [
             cuadernillo,
+            fecha_cuadernillo,
             radicacion,
+            fecha_radicacion,
             correcciones,
             acta_aceptacion,
-            desprendible,
             tipo_proceso,
             juzgado,
             nombre_liquidador,
@@ -105,6 +108,32 @@ const insolvenciaModel = {
             await connection.query(insertSql, [values]);
         } catch (error) {
             console.error('Error al insertar audiencias:', error);
+            throw error;
+        } finally {
+            connection.release();
+        }
+    },
+
+    insertarDesprendibles: async (id_insolvencia, desprendibles) => {
+        const connection = await pool.getConnection();
+        try {
+            const values = desprendibles.map(d => [
+                d.estado_desprendible,
+                d.desprendible,
+                d.obs_desprendible,
+                d.couta_pagar,
+                id_insolvencia
+            ]);
+
+            const insertSql = `
+            INSERT INTO desprendibles 
+            (estado_desprendible, desprendible, obs_desprendible, couta_pagar, id_insolvencia)
+            VALUES ?
+        `;
+
+            await connection.query(insertSql, [values]);
+        } catch (error) {
+            console.error('Error al insertar desprendibles:', error);
             throw error;
         } finally {
             connection.release();

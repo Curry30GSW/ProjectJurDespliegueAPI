@@ -27,9 +27,10 @@ const insolvenciaController = {
             const {
                 id_cliente,
                 cuadernillo,
+                fecha_cuadernillo,
                 radicacion,
+                fecha_radicacion,
                 correcciones,
-                desprendible,
                 tipo_proceso,
                 juzgado,
                 nombre_liquidador,
@@ -59,7 +60,9 @@ const insolvenciaController = {
                 const resultado = await insolvenciaModel.updateInsolvenciaData({
                     id_cliente,
                     cuadernillo,
+                    fecha_cuadernillo,
                     radicacion,
+                    fecha_radicacion,
                     correcciones,
                     acta_aceptacion: ruta_pdf,
                     desprendible,
@@ -79,9 +82,8 @@ const insolvenciaController = {
                 if (resultado.affectedRows > 0 && resultado.id_insolvencia) {
                     const id_insolvencia = resultado.id_insolvencia;
 
+                    // AUDIENCIAS
                     let audienciasArray = [];
-
-                    // Intentar parsear audiencias (si llegan como JSON string)
                     if (typeof req.body.audiencias === 'string') {
                         try {
                             audienciasArray = JSON.parse(req.body.audiencias);
@@ -92,7 +94,6 @@ const insolvenciaController = {
                         audienciasArray = req.body.audiencias;
                     }
 
-                    // Filtrar y mapear audiencias válidas
                     const audienciasLimpias = audienciasArray
                         .filter(a => a.descripcion && a.fecha)
                         .map(a => ({
@@ -100,24 +101,49 @@ const insolvenciaController = {
                             fecha_audiencias: a.fecha,
                             id_insolvencia
                         }));
+
                     if (audienciasLimpias.length > 0) {
                         await insolvenciaModel.insertarAudiencias(id_insolvencia, audienciasLimpias);
-
                     }
 
-                    res.status(200).json({
+                    // DESPRENDIBLES
+                    let desprendiblesArray = [];
+                    if (typeof req.body.desprendibles === 'string') {
+                        try {
+                            desprendiblesArray = JSON.parse(req.body.desprendibles);
+                        } catch (e) {
+                            console.warn('No se pudo parsear desprendibles:', e.message);
+                        }
+                    } else if (Array.isArray(req.body.desprendibles)) {
+                        desprendiblesArray = req.body.desprendibles;
+                    }
+
+                    const desprendiblesLimpios = desprendiblesArray
+                        .filter(d => d.estado_desprendible && d.desprendible && d.couta_pagar)
+                        .map(d => ({
+                            estado_desprendible: d.estado_desprendible,
+                            desprendible: d.desprendible,
+                            observaciones: d.observaciones || '',
+                            couta_pagar: d.couta_pagar
+                        }));
+
+                    if (desprendiblesLimpios.length > 0) {
+                        await insolvenciaModel.insertarDesprendibles(id_insolvencia, desprendiblesLimpios);
+                    }
+
+                    return res.status(200).json({
                         success: true,
-                        message: 'Datos de insolvencia y audiencias guardados correctamente.'
+                        message: 'Datos de insolvencia, audiencias y desprendibles guardados correctamente.'
                     });
                 } else {
-                    res.status(404).json({
+                    return res.status(404).json({
                         success: false,
                         message: 'No se encontró el cliente para actualizar.'
                     });
                 }
             } catch (error) {
                 console.error('Error al actualizar insolvencia:', error);
-                res.status(500).json({
+                return res.status(500).json({
                     success: false,
                     message: 'Error interno al actualizar insolvencia.'
                 });
