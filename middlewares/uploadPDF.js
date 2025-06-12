@@ -13,7 +13,7 @@ const uploadPDF = multer({
     }
 }).fields([
     { name: 'archivoPDF', maxCount: 1 },
-    { name: 'desprendiblePDFUrl', maxCount: 1 }
+    { name: 'desprendiblePDF', maxCount: 1 }
 ]);
 
 module.exports = uploadPDF;

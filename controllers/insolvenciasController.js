@@ -39,21 +39,45 @@ const insolvenciaController = {
                 pago_liquidador,
                 terminacion,
                 motivo_insolvencia,
-                asesor_insolvencia
+                asesor_insolvencia,
+                datos_desprendible
             } = req.body;
 
             let ruta_pdf = null;
+            let desprendibleData = {};
 
             try {
-                // Si se subió el archivo, guardarlo en disco
-                if (req.file) {
-                    const nombreArchivo = `Acta-ID-${id_cliente}.pdf`;
-                    const carpetaDestino = path.join(__dirname, '..', 'uploads', 'acta-aceptacion');
-                    if (!fs.existsSync(carpetaDestino)) fs.mkdirSync(carpetaDestino, { recursive: true });
+                if (req.files) {
+                    // Procesar archivoPDF (Acta de aceptación)
+                    if (req.files['archivoPDF'] && req.files['archivoPDF'][0]) {
+                        const archivo = req.files['archivoPDF'][0];
+                        const nombreArchivo = `Acta-ID-${id_cliente}.pdf`;
+                        const carpetaDestino = path.join(__dirname, '..', 'uploads', 'acta-aceptacion');
+                        if (!fs.existsSync(carpetaDestino)) fs.mkdirSync(carpetaDestino, { recursive: true });
 
-                    const rutaCompleta = path.join(carpetaDestino, nombreArchivo);
-                    fs.writeFileSync(rutaCompleta, req.file.buffer);
-                    ruta_pdf = `/uploads/acta-aceptacion/${nombreArchivo}`;
+                        const rutaCompleta = path.join(carpetaDestino, nombreArchivo);
+                        fs.writeFileSync(rutaCompleta, archivo.buffer);
+                        ruta_pdf = `/uploads/acta-aceptacion/${nombreArchivo}`;
+                    }
+
+                    // Procesar desprendiblePDF
+                    if (req.files['desprendiblePDF'] && req.files['desprendiblePDF'][0]) {
+                        const desprendible = req.files['desprendiblePDF'][0];
+                        const nombreDesprendible = `Desprendible-ID-${id_cliente}.pdf`;
+                        const carpetaDestino = path.join(__dirname, '..', 'uploads', 'desprendibles');
+                        if (!fs.existsSync(carpetaDestino)) fs.mkdirSync(carpetaDestino, { recursive: true });
+
+                        const rutaCompleta = path.join(carpetaDestino, nombreDesprendible);
+                        fs.writeFileSync(rutaCompleta, desprendible.buffer);
+
+                        // Parsear datos_desprendible si existe
+                        try {
+                            desprendibleData = datos_desprendible ? JSON.parse(datos_desprendible) : {};
+                            desprendibleData.desprendible = `/uploads/desprendibles/${nombreDesprendible}`;
+                        } catch (e) {
+                            console.error('Error al parsear datos_desprendible:', e);
+                        }
+                    }
                 }
 
                 // 1. Actualizar datos de insolvencia
@@ -65,7 +89,6 @@ const insolvenciaController = {
                     fecha_radicacion,
                     correcciones,
                     acta_aceptacion: ruta_pdf,
-                    desprendible,
                     tipo_proceso,
                     juzgado,
                     nombre_liquidador,
@@ -77,8 +100,7 @@ const insolvenciaController = {
                     asesor_insolvencia
                 });
 
-
-                // 2. Si se actualizó correctamente, procesar audiencias
+                // 2. Si se actualizó correctamente, procesar audiencias y desprendibles
                 if (resultado.affectedRows > 0 && resultado.id_insolvencia) {
                     const id_insolvencia = resultado.id_insolvencia;
 
@@ -106,29 +128,16 @@ const insolvenciaController = {
                         await insolvenciaModel.insertarAudiencias(id_insolvencia, audienciasLimpias);
                     }
 
-                    // DESPRENDIBLES
-                    let desprendiblesArray = [];
-                    if (typeof req.body.desprendibles === 'string') {
-                        try {
-                            desprendiblesArray = JSON.parse(req.body.desprendibles);
-                        } catch (e) {
-                            console.warn('No se pudo parsear desprendibles:', e.message);
-                        }
-                    } else if (Array.isArray(req.body.desprendibles)) {
-                        desprendiblesArray = req.body.desprendibles;
-                    }
+                    // DESPRENDIBLES (usando los datos procesados)
+                    if (Object.keys(desprendibleData).length > 0) {
+                        const desprendibleLimpio = {
+                            estado_desprendible: desprendibleData.estado || '',
+                            desprendible: desprendibleData.desprendible || null,
+                            obs_desprendible: desprendibleData.obs_desprendible || '',
+                            cuota_pagar: desprendibleData.datos_parcial?.cuota_pagar || ''
+                        };
 
-                    const desprendiblesLimpios = desprendiblesArray
-                        .filter(d => d.estado_desprendible && d.desprendible && d.couta_pagar)
-                        .map(d => ({
-                            estado_desprendible: d.estado_desprendible,
-                            desprendible: d.desprendible,
-                            observaciones: d.observaciones || '',
-                            couta_pagar: d.couta_pagar
-                        }));
-
-                    if (desprendiblesLimpios.length > 0) {
-                        await insolvenciaModel.insertarDesprendibles(id_insolvencia, desprendiblesLimpios);
+                        await insolvenciaModel.insertarDesprendibles(id_insolvencia, [desprendibleLimpio]);
                     }
 
                     return res.status(200).json({
@@ -171,6 +180,7 @@ const insolvenciaController = {
             res.status(500).json({ success: false, message: 'Error interno del servidor.' });
         }
     },
+
 
 
 

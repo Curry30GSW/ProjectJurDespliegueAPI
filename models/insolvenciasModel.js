@@ -121,14 +121,14 @@ const insolvenciaModel = {
                 d.estado_desprendible,
                 d.desprendible,
                 d.obs_desprendible,
-                d.couta_pagar,
+                d.cuota_pagar,
                 id_insolvencia
             ]);
 
             const insertSql = `
-            INSERT INTO desprendibles 
-            (estado_desprendible, desprendible, obs_desprendible, couta_pagar, id_insolvencia)
-            VALUES ?
+        INSERT INTO desprendible 
+        (estado_desprendible, desprendible, obs_desprendible, cuota_pagar, id_insolvencia)
+        VALUES ?
         `;
 
             await connection.query(insertSql, [values]);
@@ -141,48 +141,83 @@ const insolvenciaModel = {
     },
 
     getClienteInsolByCedula: async (cedula) => {
-        try {
-            const [rows] = await pool.query(`
-                SELECT 
-                    c.id_cliente, 
-                    c.nombres, 
-                    c.apellidos, 
-                    c.cedula, 
-                    c.correo,
-                    c.fecha_vinculo,
-                    c.foto_perfil,
-                    c.telefono,
-                    c.direccion,
-                    c.ciudad,
-                    i.id_insolvencia,
-                    i.terminacion,
-                    i.tipo_proceso,
-                    i.desprendible,
-                    i.cuadernillo,
-                    i.radicacion,
-                    i.correcciones,
-                    i.acta_aceptacion,
-                    i.juzgado,
-                    i.nombre_liquidador,
-                    i.telefono_liquidador,
-                    i.correo_liquidador,
-                    i.pago_liquidador,
-                    i.motivo_insolvencia,
-                    i.asesor_insolvencia
-                FROM 
-                    clientes c
-                JOIN 
-                    insolvencia i ON c.id_cliente = i.id_cliente
-                WHERE 
-                    c.cedula = ?
-            `, [cedula]);
+        const connection = await pool.getConnection();
 
-            return rows[0]; // Devuelve el primer registro encontrado (si hay alguno)
+        try {
+            // Cliente + Insolvencia + Desprendible (sin audiencias)
+            const [clienteRows] = await connection.query(`
+            SELECT 
+                c.id_cliente, 
+                c.nombres, 
+                c.apellidos, 
+                c.cedula, 
+                c.correo,
+                c.fecha_vinculo,
+                c.foto_perfil,
+                c.telefono,
+                c.direccion,
+                c.ciudad,
+                i.id_insolvencia,
+                i.terminacion,
+                i.tipo_proceso,
+                i.desprendible,
+                i.cuadernillo,
+                i.fecha_cuadernillo,
+                i.radicacion,
+                i.fecha_radicacion,
+                i.correcciones,
+                i.acta_aceptacion,
+                i.juzgado,
+                i.nombre_liquidador,
+                i.telefono_liquidador,
+                i.correo_liquidador,
+                i.pago_liquidador,
+                i.motivo_insolvencia,
+                i.asesor_insolvencia,
+                d.estado_desprendible,
+                d.desprendible AS ruta_desprendible,
+                d.obs_desprendible,
+                d.cuota_pagar AS cuota_pagar
+            FROM 
+                clientes c
+            JOIN 
+                insolvencia i ON c.id_cliente = i.id_cliente
+            LEFT JOIN 
+                desprendible d ON i.id_insolvencia = d.id_insolvencia
+            WHERE 
+                c.cedula = ?
+            LIMIT 1
+        `, [cedula]);
+
+            if (clienteRows.length === 0) {
+                return null;
+            }
+
+            const cliente = clienteRows[0];
+
+            // Audiencias (todas)
+            const [audienciasRows] = await connection.query(`
+            SELECT 
+                audiencia,
+                fecha_audiencias
+            FROM 
+                audiencias
+            WHERE 
+                id_insolvencia = ?
+        `, [cliente.id_insolvencia]);
+
+            cliente.audiencias = audienciasRows;
+
+            return cliente;
+
         } catch (error) {
-            console.error('Error al obtener cliente e insolvencia por cédula:', error);
+            console.error('Error en getClienteInsolByCedula:', error);
             throw error;
+        } finally {
+            connection.release();
         }
     },
+
 
 };
 
