@@ -49,10 +49,6 @@ const ClienteController = {
       // 3. Validación de campos numéricos
       const salario = parseInt(req.body.ingresos?.toString().replace(/\D/g, '')) || 0;
 
-      if (req.files?.['data_credito']?.[0]) {
-        req.body.data_credPdf = '/uploads/dataCredito/' + req.files['data_credito'][0].filename;
-      }
-
       // 4. Construcción segura del objeto cliente (parte corregida)
       const clienteData = {
         ...req.body,
@@ -69,7 +65,10 @@ const ClienteController = {
         data_credPdf: req.body.data_credPdf || null,
         bienes: req.body.bienes === 'si' ? 1 : 0,
         bienes_inmuebles: req.body.bienes_inmuebles || null,
-        data_credito: req.body.dataCreditoPdfUrl ? 1 : 0,
+        valor_cuota: req.body.valor_cuota ? parseInt(req.body.valor_cuota.toString().replace(/\D/g, '')) : null,
+        porcentaje: req.body.porcentaje ? parseFloat(req.body.porcentaje) : null,
+        valor_insolvencia: req.body.valor_insolvencia ? parseInt(req.body.valor_insolvencia.toString().replace(/\D/g, '')) : null,
+        numero_cuotas: req.body.numero_cuotas ? parseInt(req.body.numero_cuotas) : null,
         referencias_personales,
         referencias_familiares
       };
@@ -175,9 +174,6 @@ const ClienteController = {
         if (req.files['desprendible_pago']?.[0]) {
           clienteData.desprendible = '/uploads/desprendible/' + req.files['desprendible_pago'][0].filename;
         }
-        if (req.files['data_credito']?.[0]) {
-          clienteData.data_credito_archivo = '/uploads/dataCredito/' + req.files['data_credito'][0].filename;
-        }
         if (req.files['bienes_inmuebles[]']) {
           clienteData.bienes_rutas = req.files['bienes_inmuebles[]'].map(file => '/uploads/bienesInmuebles/' + file.filename);
         }
@@ -187,9 +183,6 @@ const ClienteController = {
       // Convertir campos booleanos
       if (req.body.bienes_inmuebles !== undefined) {
         clienteData.bienes_inmuebles = req.body.bienes_inmuebles === 'si' ? 'si' : 'no';
-      }
-      if (req.body.data_credito !== undefined) {
-        clienteData.data_credito = req.body.data_credito === 'si' ? 'si' : 'no';
       }
 
       const result = await ClienteModel.updateCliente(cedula, clienteData);

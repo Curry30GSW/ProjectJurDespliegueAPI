@@ -50,14 +50,28 @@ const ClienteModel = {
         throw new Error('Ya existe un cliente con esa cédula');
       }
 
+
+      const limpiarValorMonetario = (valor) => {
+        if (valor === null || valor === undefined) return null;
+        if (typeof valor === 'number') return valor;
+        return parseInt(valor.toString().replace(/[^\d]/g, '')) || null;
+      };
+
+      const limpiarPorcentaje = (valor) => {
+        if (valor === null || valor === undefined) return null;
+        if (typeof valor === 'number') return valor;
+        return parseFloat(valor.toString().replace(',', '.').replace(/[^\d.]/g, '')) || null;
+      };
+
       // Insertar cliente principal
       const clienteQuery = `
-        INSERT INTO clientes (
-            nombres, apellidos, cedula, cedula_pdf, direccion, telefono, sexo, fecha_nac,
-            edad, ciudad, correo, barrio, estado_civil, laboral, empresa, cargo, pagaduria, 
-            salario, desprendible, bienes, asesor, foto_perfil, bienes_inmuebles  
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
+      INSERT INTO clientes (
+          nombres, apellidos, cedula, cedula_pdf, direccion, telefono, sexo, fecha_nac,
+          edad, ciudad, correo, barrio, estado_civil, laboral, empresa, cargo, pagaduria, 
+          salario, desprendible, bienes, asesor, foto_perfil, bienes_inmuebles,
+          valor_cuota, porcentaje, valor_insolvencia, numero_cuotas 
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
 
       const clienteValues = [
         clienteData.nombres || null,
@@ -80,10 +94,13 @@ const ClienteModel = {
         clienteData.salario ? parseInt(clienteData.salario) : null,
         clienteData.desprendible || null,
         clienteData.bienes === 'si' ? 1 : 0,
-        clienteData.data_credito === 'si' ? 1 : 0,
         clienteData.asesor || null,
         clienteData.foto_perfil || null,
-        clienteData.bienes_inmuebles || null
+        clienteData.bienes_inmuebles || null,
+        limpiarValorMonetario(clienteData.valor_cuota),
+        limpiarPorcentaje(clienteData.porcentaje),
+        limpiarValorMonetario(clienteData.valor_insolvencia),
+        clienteData.numero_cuotas ? parseInt(clienteData.numero_cuotas) : null
       ];
 
       const [result] = await connection.query(clienteQuery, clienteValues);
