@@ -21,8 +21,7 @@ const insolvenciaModel = {
                     c.numero_cuotas,
                     i.id_insolvencia,
                     i.terminacion,
-                    i.tipo_proceso,
-                    i.desprendible
+                    i.tipo_proceso
                 FROM 
                     clientes c
                 JOIN 
@@ -51,7 +50,8 @@ const insolvenciaModel = {
         pago_liquidador,
         terminacion,
         motivo_insolvencia,
-        asesor_insolvencia
+        asesor_insolvencia,
+        autoliquidador
     }) => {
         const [result] = await pool.query(`
         UPDATE insolvencia 
@@ -69,7 +69,8 @@ const insolvenciaModel = {
             pago_liquidador = ?, 
             terminacion = ?, 
             motivo_insolvencia = ?,
-            asesor_insolvencia = ?
+            asesor_insolvencia = ?,
+            autoliquidador = ?
         WHERE id_cliente = ?
     `, [
             cuadernillo,
@@ -87,6 +88,7 @@ const insolvenciaModel = {
             terminacion,
             motivo_insolvencia,
             asesor_insolvencia,
+            autoliquidador,
             id_cliente
         ]);
 
@@ -119,7 +121,7 @@ const insolvenciaModel = {
     },
 
     insertarDesprendibles: async (id_insolvencia, desprendibles) => {
-        
+
         const connection = await pool.getConnection();
         try {
             const values = desprendibles.map(d => [
@@ -144,11 +146,11 @@ const insolvenciaModel = {
         }
     },
 
-  getClienteInsolByCedula: async (cedula) => {
-    const connection = await pool.getConnection();
+    getClienteInsolByCedula: async (cedula) => {
+        const connection = await pool.getConnection();
 
-    try {
-        const [clienteRows] = await connection.query(`
+        try {
+            const [clienteRows] = await connection.query(`
             SELECT 
                 c.id_cliente, 
                 c.nombres, 
@@ -167,7 +169,7 @@ const insolvenciaModel = {
                 i.id_insolvencia,
                 i.terminacion,
                 i.tipo_proceso,
-                i.desprendible,
+                i.autoliquidador,
                 i.cuadernillo,
                 i.fecha_cuadernillo,
                 i.radicacion,
@@ -207,13 +209,13 @@ const insolvenciaModel = {
             LIMIT 1
         `, [cedula]);
 
-        if (clienteRows.length === 0) {
-            return null;
-        }
+            if (clienteRows.length === 0) {
+                return null;
+            }
 
-        const cliente = clienteRows[0];
+            const cliente = clienteRows[0];
 
-        const [audienciasRows] = await connection.query(`
+            const [audienciasRows] = await connection.query(`
             SELECT 
                 audiencia,
                 fecha_audiencias
@@ -223,17 +225,17 @@ const insolvenciaModel = {
                 id_insolvencia = ?
         `, [cliente.id_insolvencia]);
 
-        cliente.audiencias = audienciasRows;
+            cliente.audiencias = audienciasRows;
 
-        return cliente;
+            return cliente;
 
-    } catch (error) {
-        console.error('Error en getClienteInsolByCedula:', error);
-        throw error;
-    } finally {
-        connection.release();
-    }
-},
+        } catch (error) {
+            console.error('Error en getClienteInsolByCedula:', error);
+            throw error;
+        } finally {
+            connection.release();
+        }
+    },
 
 
 

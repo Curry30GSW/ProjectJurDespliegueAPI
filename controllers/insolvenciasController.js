@@ -23,8 +23,6 @@ const insolvenciaController = {
                 console.error('Error en la subida del archivo:', err.message);
                 return res.status(400).json({ success: false, message: err.message });
             }
-    console.log('BODY RECIBIDO:', req.body);
-    console.log('FILES RECIBIDOS:', req.files);
             const {
                 id_cliente,
                 cuadernillo,
@@ -46,6 +44,7 @@ const insolvenciaController = {
 
             let ruta_pdf = null;
             let desprendibleData = {};
+            let ruta_autoliquidador = null;
 
             try {
                 if (req.files) {
@@ -79,6 +78,20 @@ const insolvenciaController = {
                             console.error('Error al parsear datos_desprendible:', e);
                         }
                     }
+
+
+                    if (req.files['archivoAutoliquidador'] && req.files['archivoAutoliquidador'][0]) {
+                        const autoliquidador = req.files['archivoAutoliquidador'][0];
+                        const nombreAutoliquidador = `Autoliquidador-ID-${id_cliente}.pdf`;
+                        const carpetaDestino = path.join(__dirname, '..', 'uploads', 'autoliquidador');
+                        if (!fs.existsSync(carpetaDestino)) fs.mkdirSync(carpetaDestino, { recursive: true });
+
+                        const rutaCompleta = path.join(carpetaDestino, nombreAutoliquidador);
+                        fs.writeFileSync(rutaCompleta, autoliquidador.buffer);
+
+                        ruta_autoliquidador = `/uploads/autoliquidador/${nombreAutoliquidador}`;
+                    }
+
                 }
 
                 // 1. Actualizar datos de insolvencia
@@ -98,7 +111,8 @@ const insolvenciaController = {
                     pago_liquidador,
                     terminacion,
                     motivo_insolvencia,
-                    asesor_insolvencia
+                    asesor_insolvencia,
+                    autoliquidador: ruta_autoliquidador
                 });
 
                 // 2. Si se actualizó correctamente, procesar audiencias y desprendibles
@@ -131,12 +145,12 @@ const insolvenciaController = {
 
                     // DESPRENDIBLES (usando los datos procesados)
                     if (Object.keys(desprendibleData).length > 0) {
-                     const desprendibleLimpio = {
+                        const desprendibleLimpio = {
                             estado_desprendible: desprendibleData.estado_desprendible || '',
                             desprendible: desprendibleData.desprendible || null,
                             obs_desprendible: desprendibleData.obs_desprendible || '',
                             cuota_pagar: desprendibleData.datos_parcial?.cuota_pagar || ''
-                        };      
+                        };
                         await insolvenciaModel.insertarDesprendibles(id_insolvencia, [desprendibleLimpio]);
                     }
 
