@@ -23,7 +23,8 @@ const insolvenciaController = {
                 console.error('Error en la subida del archivo:', err.message);
                 return res.status(400).json({ success: false, message: err.message });
             }
-
+    console.log('BODY RECIBIDO:', req.body);
+    console.log('FILES RECIBIDOS:', req.files);
             const {
                 id_cliente,
                 cuadernillo,
@@ -130,13 +131,12 @@ const insolvenciaController = {
 
                     // DESPRENDIBLES (usando los datos procesados)
                     if (Object.keys(desprendibleData).length > 0) {
-                        const desprendibleLimpio = {
-                            estado_desprendible: desprendibleData.estado || '',
+                     const desprendibleLimpio = {
+                            estado_desprendible: desprendibleData.estado_desprendible || '',
                             desprendible: desprendibleData.desprendible || null,
                             obs_desprendible: desprendibleData.obs_desprendible || '',
                             cuota_pagar: desprendibleData.datos_parcial?.cuota_pagar || ''
-                        };
-
+                        };      
                         await insolvenciaModel.insertarDesprendibles(id_insolvencia, [desprendibleLimpio]);
                     }
 

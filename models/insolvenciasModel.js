@@ -119,6 +119,7 @@ const insolvenciaModel = {
     },
 
     insertarDesprendibles: async (id_insolvencia, desprendibles) => {
+        
         const connection = await pool.getConnection();
         try {
             const values = desprendibles.map(d => [
@@ -128,7 +129,6 @@ const insolvenciaModel = {
                 d.cuota_pagar,
                 id_insolvencia
             ]);
-
             const insertSql = `
         INSERT INTO desprendible 
         (estado_desprendible, desprendible, obs_desprendible, cuota_pagar, id_insolvencia)
@@ -144,12 +144,11 @@ const insolvenciaModel = {
         }
     },
 
-    getClienteInsolByCedula: async (cedula) => {
-        const connection = await pool.getConnection();
+  getClienteInsolByCedula: async (cedula) => {
+    const connection = await pool.getConnection();
 
-        try {
-            // Cliente + Insolvencia + Desprendible (sin audiencias)
-            const [clienteRows] = await connection.query(`
+    try {
+        const [clienteRows] = await connection.query(`
             SELECT 
                 c.id_cliente, 
                 c.nombres, 
@@ -190,21 +189,31 @@ const insolvenciaModel = {
                 clientes c
             JOIN 
                 insolvencia i ON c.id_cliente = i.id_cliente
-            LEFT JOIN 
-                desprendible d ON i.id_insolvencia = d.id_insolvencia
+            LEFT JOIN (
+                SELECT d.*
+                FROM desprendible d
+                INNER JOIN (
+                    SELECT 
+                        id_insolvencia,
+                        MAX(id_desprendible) AS max_id
+                    FROM 
+                        desprendible
+                    GROUP BY 
+                        id_insolvencia
+                ) latest ON d.id_insolvencia = latest.id_insolvencia AND d.id_desprendible = latest.max_id
+            ) d ON i.id_insolvencia = d.id_insolvencia
             WHERE 
                 c.cedula = ?
             LIMIT 1
         `, [cedula]);
 
-            if (clienteRows.length === 0) {
-                return null;
-            }
+        if (clienteRows.length === 0) {
+            return null;
+        }
 
-            const cliente = clienteRows[0];
+        const cliente = clienteRows[0];
 
-            // Audiencias (todas)
-            const [audienciasRows] = await connection.query(`
+        const [audienciasRows] = await connection.query(`
             SELECT 
                 audiencia,
                 fecha_audiencias
@@ -214,17 +223,18 @@ const insolvenciaModel = {
                 id_insolvencia = ?
         `, [cliente.id_insolvencia]);
 
-            cliente.audiencias = audienciasRows;
+        cliente.audiencias = audienciasRows;
 
-            return cliente;
+        return cliente;
 
-        } catch (error) {
-            console.error('Error en getClienteInsolByCedula:', error);
-            throw error;
-        } finally {
-            connection.release();
-        }
-    },
+    } catch (error) {
+        console.error('Error en getClienteInsolByCedula:', error);
+        throw error;
+    } finally {
+        connection.release();
+    }
+},
+
 
 
 };
