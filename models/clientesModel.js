@@ -65,13 +65,17 @@ const ClienteModel = {
 
       // Insertar cliente principal
       const clienteQuery = `
-      INSERT INTO clientes (
-          nombres, apellidos, cedula, cedula_pdf, direccion, telefono, sexo, fecha_nac,
-          edad, ciudad, correo, barrio, estado_civil, laboral, empresa, cargo, pagaduria, 
-          salario, desprendible, bienes, asesor, foto_perfil, bienes_inmuebles,
-          valor_cuota, porcentaje, valor_insolvencia, numero_cuotas 
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+        INSERT INTO clientes (
+            nombres, apellidos, cedula, cedula_pdf, direccion, telefono, sexo, fecha_nac,
+            edad, ciudad, correo, barrio, estado_civil, laboral, empresa, cargo, 
+            salario, desprendible, bienes, asesor, foto_perfil, bienes_inmuebles,
+            valor_cuota, porcentaje, valor_insolvencia, numero_cuotas 
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+      if (clienteData.bienes === 'no') {
+        clienteData.bienes_inmuebles = 'NO APLICA';
+      }
 
       const clienteValues = [
         clienteData.nombres || null,
@@ -90,13 +94,15 @@ const ClienteModel = {
         clienteData.laboral,
         clienteData.empresa || 'NO APLICA',
         clienteData.cargo || 'NO APLICA',
-        clienteData.pagaduria || 'NO APLICA',
         clienteData.salario ? parseInt(clienteData.salario) : null,
         clienteData.desprendible || null,
         clienteData.bienes === 'si' ? 1 : 0,
         clienteData.asesor || null,
         clienteData.foto_perfil || null,
-        clienteData.bienes_inmuebles || null,
+        clienteData.bienes_inmuebles && clienteData.bienes_inmuebles.trim() !== ''
+          ? clienteData.bienes_inmuebles
+          : 'NO APLICA',
+
         limpiarValorMonetario(clienteData.valor_cuota),
         limpiarPorcentaje(clienteData.porcentaje),
         limpiarValorMonetario(clienteData.valor_insolvencia),
@@ -109,6 +115,22 @@ const ClienteModel = {
         `INSERT INTO datacredito (id_cliente, nombreData) VALUES (?, ?)`,
         [id_cliente, '']
       );
+
+      if (Array.isArray(clienteData.pagadurias) && clienteData.pagadurias.length > 0) {
+        for (const pag of clienteData.pagadurias) {
+          await connection.query(
+            `INSERT INTO pagadurias_cliente (id_cliente, nombre_pagaduria, valor_pagaduria, descuento_pagaduria)
+       VALUES (?, ?, ?, ?)`,
+            [
+              id_cliente,
+              pag.nombre,
+              limpiarValorMonetario(pag.valor),
+              limpiarPorcentaje(pag.descuento)
+            ]
+          );
+        }
+      }
+
       // Insertar referencias personales
       for (const ref of clienteData.referencias_personales) {
         await connection.query(
