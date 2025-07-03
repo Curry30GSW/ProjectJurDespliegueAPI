@@ -23,6 +23,7 @@ const insolvenciaController = {
                 console.error('Error en la subida del archivo:', err.message);
                 return res.status(400).json({ success: false, message: err.message });
             }
+
             const {
                 id_cliente,
                 cuadernillo,
@@ -42,12 +43,16 @@ const insolvenciaController = {
                 datos_desprendible
             } = req.body;
 
+            // Determinar si hay correcciones (texto no vacío)
+            const hayCorrecciones = correcciones && correcciones.trim() !== '';
+
             let ruta_pdf = null;
             let desprendibleData = {};
             let ruta_autoliquidador = null;
 
             try {
-                if (req.files) {
+                // Procesar archivos solo si NO hay correcciones
+                if (req.files && !hayCorrecciones) {
                     // Procesar archivoPDF (Acta de aceptación)
                     if (req.files['archivoPDF'] && req.files['archivoPDF'][0]) {
                         const archivo = req.files['archivoPDF'][0];
@@ -70,7 +75,6 @@ const insolvenciaController = {
                         const rutaCompleta = path.join(carpetaDestino, nombreDesprendible);
                         fs.writeFileSync(rutaCompleta, desprendible.buffer);
 
-                        // Parsear datos_desprendible si existe
                         try {
                             desprendibleData = datos_desprendible ? JSON.parse(datos_desprendible) : {};
                             desprendibleData.desprendible = `/uploads/desprendibles/${nombreDesprendible}`;
@@ -79,7 +83,7 @@ const insolvenciaController = {
                         }
                     }
 
-
+                    // Procesar autoliquidador
                     if (req.files['archivoAutoliquidador'] && req.files['archivoAutoliquidador'][0]) {
                         const autoliquidador = req.files['archivoAutoliquidador'][0];
                         const nombreAutoliquidador = `Autoliquidador-ID-${id_cliente}.pdf`;
@@ -88,35 +92,50 @@ const insolvenciaController = {
 
                         const rutaCompleta = path.join(carpetaDestino, nombreAutoliquidador);
                         fs.writeFileSync(rutaCompleta, autoliquidador.buffer);
-
                         ruta_autoliquidador = `/uploads/autoliquidador/${nombreAutoliquidador}`;
                     }
-
                 }
 
                 // 1. Actualizar datos de insolvencia
-                const resultado = await insolvenciaModel.updateInsolvenciaData({
+                const updateData = {
                     id_cliente,
-                    cuadernillo,
-                    fecha_cuadernillo,
-                    radicacion,
-                    fecha_radicacion,
-                    correcciones,
-                    acta_aceptacion: ruta_pdf,
-                    tipo_proceso,
-                    juzgado,
-                    nombre_liquidador,
-                    telefono_liquidador,
-                    correo_liquidador,
-                    pago_liquidador,
-                    terminacion,
-                    motivo_insolvencia,
-                    asesor_insolvencia,
-                    autoliquidador: ruta_autoliquidador
-                });
+                    correcciones: hayCorrecciones ? correcciones : null
+                };
 
-                // 2. Si se actualizó correctamente, procesar audiencias y desprendibles
-                if (resultado.affectedRows > 0 && resultado.id_insolvencia) {
+                // Solo agregar otros campos si NO hay correcciones
+                if (!hayCorrecciones) {
+                    Object.assign(updateData, {
+                        cuadernillo,
+                        fecha_cuadernillo,
+                        radicacion,
+                        fecha_radicacion,
+                        acta_aceptacion: ruta_pdf,
+                        tipo_proceso,
+                        juzgado,
+                        nombre_liquidador,
+                        telefono_liquidador,
+                        correo_liquidador,
+                        pago_liquidador,
+                        terminacion,
+                        motivo_insolvencia,
+                        asesor_insolvencia,
+                        autoliquidador: ruta_autoliquidador,
+                        valor_liquidador: req.body.valor_liquidador || '0',
+                        cuota_1: req.body.cuota_1 || '0',
+                        cuota_2: req.body.cuota_2 || '0',
+                        cuota_3: req.body.cuota_3 || '0',
+                        cuota_4: req.body.cuota_4 || '0',
+                        fecha_1: req.body.fecha_1 || null,
+                        fecha_2: req.body.fecha_2 || null,
+                        fecha_3: req.body.fecha_3 || null,
+                        fecha_4: req.body.fecha_4 || null
+                    });
+                }
+
+                const resultado = await insolvenciaModel.updateInsolvenciaData(updateData);
+
+                // 2. Procesar datos adicionales solo si NO hay correcciones
+                if (resultado.affectedRows > 0 && resultado.id_insolvencia && !hayCorrecciones) {
                     const id_insolvencia = resultado.id_insolvencia;
 
                     // AUDIENCIAS
@@ -143,7 +162,7 @@ const insolvenciaController = {
                         await insolvenciaModel.insertarAudiencias(id_insolvencia, audienciasLimpias);
                     }
 
-                    // DESPRENDIBLES (usando los datos procesados)
+                    // DESPRENDIBLES
                     if (Object.keys(desprendibleData).length > 0) {
                         const desprendibleLimpio = {
                             estado_desprendible: desprendibleData.estado_desprendible || '',
@@ -157,6 +176,11 @@ const insolvenciaController = {
                     return res.status(200).json({
                         success: true,
                         message: 'Datos de insolvencia, audiencias y desprendibles guardados correctamente.'
+                    });
+                } else if (resultado.affectedRows > 0) {
+                    return res.status(200).json({
+                        success: true,
+                        message: 'Correcciones guardadas correctamente.'
                     });
                 } else {
                     return res.status(404).json({
