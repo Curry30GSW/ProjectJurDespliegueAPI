@@ -7,7 +7,8 @@ const clienteRoutes = require('./routes/clientesRoutes');
 const authRoutes = require('./routes/authRoutes');
 const uploadsRoutes = require('./routes/uploadsRoutes');
 const dataCreditoRoutes = require('./routes/dataCreditoRoutes');
-const insolvenciasRoutes = require('./routes/insolvenciasRoutes')
+const insolvenciasRoutes = require('./routes/insolvenciasRoutes');
+const embargosRoutes = require('./routes/embargosRoutes')
 const methodOverride = require('method-override');
 
 
@@ -41,7 +42,7 @@ app.use('/auth', authRoutes);
 app.use('/api', uploadsRoutes);
 app.use('/api', dataCreditoRoutes);
 app.use('/api', insolvenciasRoutes);
-
+app.use('/api', embargosRoutes);
 
 // Iniciar servidor
 const PORT = process.env.PORT || 3000;
