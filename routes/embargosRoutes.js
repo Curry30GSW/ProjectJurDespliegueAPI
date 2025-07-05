@@ -7,5 +7,7 @@ const embargosController = require('../controllers/embargosController');
 
 router.get('/clientes-embargos', embargosController.listarClientesConEmbargos);
 
+router.get('/cliente-embargos/:cedula', embargosController.obtenerClientePorCedula);
+
 
 module.exports = router;

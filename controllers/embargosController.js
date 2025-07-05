@@ -15,6 +15,24 @@ const embargosController = {
         }
     },
 
+    obtenerClientePorCedula: async (req, res) => {
+        const { cedula } = req.params;
+
+        try {
+            const cliente = await embargosModel.getClientelByCedula(cedula);
+
+            if (!cliente) {
+                return res.status(404).json({ message: 'Cliente no encontrado' });
+            }
+
+            res.json(cliente);
+        } catch (error) {
+            console.error('Error en el controlador al obtener cliente por cédula:', error);
+            res.status(500).json({ message: 'Error interno del servidor' });
+        }
+    }
+
+
 
 };
 
