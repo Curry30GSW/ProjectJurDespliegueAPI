@@ -14,6 +14,7 @@ const methodOverride = require('method-override');
 
 app.use(methodOverride('_method'));
 
+
 // Middleware para parsear JSON
 app.use(express.json());
 
