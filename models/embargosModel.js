@@ -186,7 +186,10 @@ const embargosModel = {
             c.foto_perfil,
             e.radicado,
             e.estado_embargo,
-            e.fecha_expediente 
+            e.fecha_expediente,
+            e.id_embargos,
+            e.ruta_desprendible,
+            e.fecha_terminacion
         FROM 
             clientes c
         JOIN 
@@ -199,6 +202,84 @@ const embargosModel = {
       throw error;
     }
   },
+
+
+  saveDocumentData: async (idEmbargo, rutaDocumento, fechaDesprendible, fechaTerminacion, estadoEmbargo) => {
+    try {
+      const sql = `
+      UPDATE embargos 
+      SET ruta_desprendible = ?, 
+          fecha_desprendible = ?, 
+          fecha_terminacion = ?, 
+          estado_embargo = ?
+      WHERE id_embargos = ?
+    `;
+
+      console.log('🟡 Ejecutando SQL:');
+      console.log(sql);
+      console.log('📦 Valores:', [
+        rutaDocumento,
+        fechaDesprendible,
+        fechaTerminacion,
+        estadoEmbargo,
+        idEmbargo
+      ]);
+
+      await pool.query(sql, [
+        rutaDocumento,
+        fechaDesprendible,
+        fechaTerminacion,
+        estadoEmbargo,
+        idEmbargo
+      ]);
+
+    } catch (error) {
+      console.error('Error al guardar documento desprendible:', error);
+      throw error;
+    }
+  },
+
+  verificarEmbargosPorCliente: async (id_cliente) => {
+    const [rows] = await pool.query('SELECT * FROM embargos WHERE id_cliente = ?', [id_cliente]);
+    return rows;
+  },
+
+  insertarEmbargo: async (embargoData) => {
+    const [result] = await pool.query(`
+      INSERT INTO embargos (
+        id_cliente,
+        valor_embargo,
+        pagaduria_embargo,
+        porcentaje_embargo,
+        juzgado_embargo,
+        fecha_radicacion,
+        fecha_expediente,
+        red_judicial,
+        subsanaciones,
+        estado_embargo,
+        radicado,
+        asesor_embargo,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `, [
+      embargoData.id_cliente,
+      embargoData.valor_embargo,
+      embargoData.pagaduria_embargo,
+      embargoData.porcentaje_embargo,
+      embargoData.juzgado_embargo,
+      embargoData.fecha_radicacion,
+      embargoData.fecha_expediente,
+      embargoData.red_judicial,
+      embargoData.subsanaciones,
+      embargoData.estado_embargo,
+      embargoData.radicado,
+      embargoData.asesor_embargo
+    ]);
+    return result.insertId;
+  }
+
+
 };
 
 module.exports = embargosModel;

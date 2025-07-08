@@ -110,7 +110,86 @@ const embargosController = {
             console.error('Error al obtener los embargos aceptados:', error);
             res.status(500).json({ error: 'Error al obtener los embargos aceptados' });
         }
+    },
+
+    subirDocumento: async (req, res) => {
+        try {
+            const { id_embargos, estado_embargo } = req.body;
+
+            if (!req.file) {
+                return res.status(400).json({ message: 'No se adjuntó ningún archivo.' });
+            }
+
+            const rutaDocumento = req.file.storedPath;
+
+            // Obtener fecha actual (restando 5 horas para hora local)
+            const ahora = new Date();
+            const fechaLocal = new Date(ahora.getTime() - 5 * 60 * 60 * 1000);
+
+            // Fecha del desprendible: ahora
+            const fechaDesprendible = fechaLocal.toISOString().slice(0, 19).replace('T', ' ');
+
+            // Fecha de terminación: 4 meses después
+            const fechaTerminacionObj = new Date(fechaLocal);
+            fechaTerminacionObj.setMonth(fechaTerminacionObj.getMonth() + 4);
+            const fechaTerminacion = fechaTerminacionObj.toISOString().slice(0, 19).replace('T', ' ');
+
+            console.log('➡️ Enviando a modelo:', {
+                id_embargos,
+                rutaDocumento,
+                fechaDesprendible,
+                fechaTerminacion,
+                estado_embargo
+            });
+
+            await embargosModel.saveDocumentData(
+                id_embargos,
+                rutaDocumento,
+                fechaDesprendible,
+                fechaTerminacion,
+                estado_embargo
+            );
+
+            res.status(200).json({ message: 'Documento guardado correctamente.' });
+
+        } catch (error) {
+            console.error('Error en subirDocumento:', error);
+            res.status(500).json({ message: 'Error al guardar el documento.' });
+        }
+    },
+
+    insertarConValidacion: async (req, res) => {
+        const embargoData = req.body;
+
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            const existingEmbargos = await EmbargosModel.verificarEmbargosPorCliente(embargoData.id_cliente);
+
+            if (existingEmbargos.length > 0) {
+                console.log(`Ya existen ${existingEmbargos.length} embargos para el cliente ${embargoData.id_cliente}`);
+            }
+
+            const id_embargo = await EmbargosModel.insertarEmbargo(embargoData);
+
+            await connection.commit();
+            res.status(200).json({
+                mensaje: existingEmbargos.length > 0
+                    ? 'Ya existía embargo. Se creó uno nuevo.'
+                    : 'Embargo creado correctamente.',
+                id_embargo
+            });
+        } catch (error) {
+            await connection.rollback();
+            console.error('Error al insertar embargo:', error);
+            res.status(500).json({ error: 'Error al insertar embargo.' });
+        } finally {
+            connection.release();
+        }
     }
+
+
 
 };
 

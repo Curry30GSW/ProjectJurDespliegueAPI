@@ -69,7 +69,7 @@ const insolvenciaController = {
                     if (req.files['desprendiblePDF'] && req.files['desprendiblePDF'][0]) {
                         const desprendible = req.files['desprendiblePDF'][0];
                         const nombreDesprendible = `Desprendible-ID-${id_cliente}.pdf`;
-                        const carpetaDestino = path.join(__dirname, '..', 'uploads', 'desprendibles');
+                        const carpetaDestino = path.join(__dirname, '..', 'uploads', 'desprendibles_insolvencia');
                         if (!fs.existsSync(carpetaDestino)) fs.mkdirSync(carpetaDestino, { recursive: true });
 
                         const rutaCompleta = path.join(carpetaDestino, nombreDesprendible);
@@ -77,7 +77,7 @@ const insolvenciaController = {
 
                         try {
                             desprendibleData = datos_desprendible ? JSON.parse(datos_desprendible) : {};
-                            desprendibleData.desprendible = `/uploads/desprendibles/${nombreDesprendible}`;
+                            desprendibleData.desprendible = `/uploads/desprendibles_insolvencia/${nombreDesprendible}`;
                         } catch (e) {
                             console.error('Error al parsear datos_desprendible:', e);
                         }
