@@ -26,6 +26,8 @@ router.get('/cliente-embargos/:cedula', embargosController.obtenerClientePorCedu
 
 router.put('/embargo/:id_embargos', embargosController.updateEmbargo);
 
+router.get('/embargos/:id', embargosController.getEmbargoPorId);
+
 router.get('/embargo/aceptados', embargosController.listarClientesConEmbargosAceptados);
 
 router.post('/subir-desprendible-embargos', upload.single('file'), async (req, res) => {
@@ -60,6 +62,8 @@ router.post('/subir-desprendible-embargos', upload.single('file'), async (req, r
     }
 });
 
-router.post('/crear-embargos', embargosController.insertarConValidacion);
+router.post('/crear-embargos', embargosController.insertarEmbargo);
+
+router.put('/embargos/:id/notificar', embargosController.actualizarNotificar);
 
 module.exports = router;

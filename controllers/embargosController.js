@@ -2,6 +2,7 @@ const embargosModel = require('../models/embargosModel');
 const path = require('path');
 const fs = require('fs');
 const uploadPDF = require('../middlewares/uploadPDF');
+const pool = require('../config/db');
 
 const embargosController = {
 
@@ -65,6 +66,22 @@ const embargosController = {
             res.json(embargos);
         } catch (error) {
             res.status(500).json({ message: error.message });
+        }
+    },
+
+    getEmbargoPorId: async (req, res) => {
+        const { id } = req.params;
+
+        try {
+            const embargo = await embargosModel.getEmbargoById(id);
+
+            if (!embargo) {
+                return res.status(404).json({ mensaje: 'Embargo no encontrado' });
+            }
+
+            res.status(200).json({ success: true, embargo });
+        } catch (error) {
+            res.status(500).json({ success: false, mensaje: 'Error al obtener el embargo' });
         }
     },
 
@@ -158,40 +175,48 @@ const embargosController = {
         }
     },
 
-    insertarConValidacion: async (req, res) => {
-        const embargoData = req.body;
-
-        const connection = await pool.getConnection();
+    insertarEmbargo: async (req, res) => {
         try {
-            await connection.beginTransaction();
+            const embargoData = req.body;
 
-            const existingEmbargos = await EmbargosModel.verificarEmbargosPorCliente(embargoData.id_cliente);
+            const resultado = await embargosModel.insertarEmbargo(embargoData, embargosModel.updateEmbargo);
 
-            if (existingEmbargos.length > 0) {
-                console.log(`Ya existen ${existingEmbargos.length} embargos para el cliente ${embargoData.id_cliente}`);
+            if (resultado.action === 'insert') {
+                res.status(201).json({
+                    message: 'Embargo creado exitosamente.',
+                    id_embargos: resultado.id
+                });
+            } else if (resultado.action === 'update') {
+                res.status(200).json({
+                    message: 'Embargo actualizado correctamente.',
+                    id_embargos: resultado.id
+                });
+            } else {
+                res.status(400).json({ message: 'No se pudo procesar la solicitud.' });
             }
-
-            const id_embargo = await EmbargosModel.insertarEmbargo(embargoData);
-
-            await connection.commit();
-            res.status(200).json({
-                mensaje: existingEmbargos.length > 0
-                    ? 'Ya existía embargo. Se creó uno nuevo.'
-                    : 'Embargo creado correctamente.',
-                id_embargo
-            });
         } catch (error) {
-            await connection.rollback();
-            console.error('Error al insertar embargo:', error);
-            res.status(500).json({ error: 'Error al insertar embargo.' });
-        } finally {
-            connection.release();
+            console.error('Error en el controlador de embargo:', error);
+            res.status(500).json({ message: 'Error del servidor.', error: error.message });
+        }
+    },
+
+    actualizarNotificar: async (req, res) => {
+        const { id } = req.params;
+        const { notificar } = req.body;
+        try {
+            const result = await embargosModel.actualizarNotificar(id, notificar);
+            if (result) {
+                return res.status(200).json({ success: true, mensaje: 'Actualización exitosa' });
+            } else {
+                return res.status(404).json({ success: false, mensaje: 'Embargo no encontrado' });
+            }
+        } catch (error) {
+            console.error('[BACKEND 7] Error en modelo:', error);
+            return res.status(500).json({ success: false, error: 'Error interno del servidor' });
         }
     }
 
 
-
 };
-
 
 module.exports = embargosController;

@@ -12,7 +12,9 @@ const embargosModel = {
             c.foto_perfil,
             e.radicado,
             estado_embargo,
-            e.fecha_expediente
+            e.fecha_expediente,
+            e.notificar,
+            e.id_embargos
         FROM 
             clientes c
         JOIN 
@@ -30,30 +32,31 @@ const embargosModel = {
     const connection = await pool.getConnection();
     try {
       const [rows] = await connection.query(`
-        SELECT 
-          c.id_cliente, 
-          c.nombres, 
-          c.apellidos, 
-          c.cedula, 
-          c.correo,
-          c.fecha_vinculo,
-          c.foto_perfil,
-          c.telefono,
-          c.ciudad,
-          e.id_embargos,
-          GROUP_CONCAT(p.nombre_pagaduria SEPARATOR ', ') AS pagadurias
-        FROM 
-          clientes c
-        JOIN 
-          embargos e ON c.id_cliente = e.id_cliente
-        LEFT JOIN 
-          pagadurias_cliente p ON c.id_cliente = p.id_cliente
-        WHERE 
-          c.cedula = ?
-        GROUP BY 
-          c.id_cliente, c.nombres, c.apellidos, c.cedula, c.correo,
-          c.fecha_vinculo, c.foto_perfil, c.telefono, c.ciudad, e.id_embargos
-        LIMIT 1
+       SELECT 
+        c.id_cliente, 
+        c.nombres, 
+        c.apellidos, 
+        c.cedula, 
+        c.correo,
+        c.fecha_vinculo,
+        c.foto_perfil,
+        c.telefono,
+        c.ciudad,
+        e.id_embargos,
+        -- Usa COALESCE: si hay pagaduría la concatena, si no hay, muestra empresa
+        COALESCE(GROUP_CONCAT(p.nombre_pagaduria SEPARATOR ', '), c.empresa) AS pagadurias
+      FROM 
+        clientes c
+      JOIN 
+        embargos e ON c.id_cliente = e.id_cliente
+      LEFT JOIN 
+        pagadurias_cliente p ON c.id_cliente = p.id_cliente
+      WHERE 
+        c.cedula = ?
+      GROUP BY 
+        c.id_cliente, c.nombres, c.apellidos, c.cedula, c.correo,
+        c.fecha_vinculo, c.foto_perfil, c.telefono, c.ciudad, e.id_embargos, c.empresa
+      LIMIT 1
       `, [cedula]);
 
       return rows[0]; // Asumimos que LIMIT 1 traerá solo un registro
@@ -72,14 +75,19 @@ const embargosModel = {
                     e.*,
                     c.nombres,
                     c.apellidos,
-                    c.cedula
+                    c.cedula,
+                    c.correo,
+                    c.telefono,
+                    c.ciudad,
+                    c.foto_perfil,
+                    c.id_cliente,
+                    c.fecha_vinculo
                 FROM 
                     embargos e
                 JOIN 
                     clientes c ON e.id_cliente = c.id_cliente
                 WHERE 
                     e.id_embargos = ?
-                LIMIT 1
             `, [id_embargos]);
 
       return rows[0];
@@ -141,11 +149,14 @@ const embargosModel = {
                     juzgado_embargo = ?,
                     fecha_radicacion = ?,
                     fecha_expediente = ?,
+                    fecha_revision_exp = ?,
                     red_judicial = ?,
                     subsanaciones = ?,
                     estado_embargo = ?,
                     radicado = ?,
                     asesor_embargo = ?,
+                    creada = 1,
+                    notificar = 0,
                     updated_at = NOW()
                 WHERE 
                     id_embargos = ?
@@ -156,6 +167,7 @@ const embargosModel = {
         embargoData.juzgado_embargo,
         embargoData.fecha_radicacion,
         embargoData.fecha_expediente,
+        embargoData.fecha_revision_exp,
         embargoData.red_judicial,
         embargoData.subsanaciones,
         embargoData.estado_embargo,
@@ -203,7 +215,6 @@ const embargosModel = {
     }
   },
 
-
   saveDocumentData: async (idEmbargo, rutaDocumento, fechaDesprendible, fechaTerminacion, estadoEmbargo) => {
     try {
       const sql = `
@@ -244,40 +255,131 @@ const embargosModel = {
     return rows;
   },
 
-  insertarEmbargo: async (embargoData) => {
-    const [result] = await pool.query(`
-      INSERT INTO embargos (
-        id_cliente,
-        valor_embargo,
-        pagaduria_embargo,
-        porcentaje_embargo,
-        juzgado_embargo,
-        fecha_radicacion,
-        fecha_expediente,
-        red_judicial,
-        subsanaciones,
-        estado_embargo,
-        radicado,
-        asesor_embargo,
-        created_at,
-        updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-    `, [
-      embargoData.id_cliente,
-      embargoData.valor_embargo,
-      embargoData.pagaduria_embargo,
-      embargoData.porcentaje_embargo,
-      embargoData.juzgado_embargo,
-      embargoData.fecha_radicacion,
-      embargoData.fecha_expediente,
-      embargoData.red_judicial,
-      embargoData.subsanaciones,
-      embargoData.estado_embargo,
-      embargoData.radicado,
-      embargoData.asesor_embargo
-    ]);
-    return result.insertId;
-  }
+  insertarEmbargo: async (embargoData, updateEmbargoFn) => {
+    const connection = await pool.getConnection();
+    try {
+      // 1. Verificar si ya hay un embargo con creada = 1
+      const [existente] = await connection.query(`
+            SELECT id_embargos 
+            FROM embargos 
+            WHERE id_cliente = ? AND creada = 1
+            LIMIT 1
+        `, [embargoData.id_cliente]);
+
+      if (existente.length > 0) {
+        // 2. Si existe, insertar uno nuevo
+        const [result] = await connection.query(`
+                INSERT INTO embargos (
+                    id_cliente,
+                    valor_embargo,
+                    pagaduria_embargo,
+                    porcentaje_embargo,
+                    juzgado_embargo,
+                    fecha_radicacion,
+                    fecha_expediente,
+                    fecha_revision_exp,
+                    red_judicial,
+                    subsanaciones,
+                    estado_embargo,
+                    radicado,
+                    asesor_embargo,
+                    creada,
+                    notificar,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, NOW())
+            `, [
+          embargoData.id_cliente,
+          embargoData.valor_embargo,
+          embargoData.pagaduria_embargo,
+          embargoData.porcentaje_embargo,
+          embargoData.juzgado_embargo,
+          embargoData.fecha_radicacion,
+          embargoData.fecha_expediente,
+          embargoData.fecha_revision_exp,
+          embargoData.red_judicial,
+          embargoData.subsanaciones,
+          embargoData.estado_embargo,
+          embargoData.radicado,
+          embargoData.asesor_embargo
+        ]);
+
+        return { action: 'insert', id: result.insertId };
+      } else {
+        // 3. Si NO existe, buscar el embargo más reciente para actualizarlo
+        const [ultimos] = await connection.query(`
+                SELECT id_embargos 
+                FROM embargos 
+                WHERE id_cliente = ? 
+                ORDER BY updated_at DESC 
+                LIMIT 1
+            `, [embargoData.id_cliente]);
+
+        if (ultimos.length === 0) {
+          // 4. Si no hay ningún embargo existente, crear uno nuevo
+          const [result] = await connection.query(`
+                    INSERT INTO embargos (
+                        id_cliente,
+                        valor_embargo,
+                        pagaduria_embargo,
+                        porcentaje_embargo,
+                        juzgado_embargo,
+                        fecha_radicacion,
+                        fecha_expediente,
+                        fecha_revision_exp,
+                        red_judicial,
+                        subsanaciones,
+                        estado_embargo,
+                        radicado,
+                        asesor_embargo,
+                        creada,
+                        notificar,
+                        updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, NOW())
+                `, [
+            embargoData.id_cliente,
+            embargoData.valor_embargo,
+            embargoData.pagaduria_embargo,
+            embargoData.porcentaje_embargo,
+            embargoData.juzgado_embargo,
+            embargoData.fecha_radicacion,
+            embargoData.fecha_expediente,
+            embargoData.fecha_revision_exp,
+            embargoData.red_judicial,
+            embargoData.subsanaciones,
+            embargoData.estado_embargo,
+            embargoData.radicado,
+            embargoData.asesor_embargo
+          ]);
+
+          return { action: 'insert', id: result.insertId };
+        }
+
+        const idActualizar = ultimos[0].id_embargos;
+        const actualizado = await updateEmbargoFn(idActualizar, embargoData);
+        return { action: 'update', id: idActualizar, updated: actualizado };
+      }
+    } catch (error) {
+      console.error('Error en insertarEmbargo:', error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  actualizarNotificar: async (id_embargos, valorNotificar) => {
+    try {
+      const [result] = await pool.query(
+        'UPDATE embargos SET notificar = ? WHERE id_embargos = ?',
+        [valorNotificar, id_embargos]
+      );
+      return result.affectedRows > 0;
+    } catch (error) {
+      console.error('Error al actualizar el campo notificar:', error);
+      throw error;
+    }
+  },
+
+
 
 
 };
