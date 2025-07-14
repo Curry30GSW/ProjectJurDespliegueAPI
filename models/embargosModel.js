@@ -71,23 +71,27 @@ const embargosModel = {
   getEmbargoById: async (id_embargos) => {
     try {
       const [rows] = await pool.query(`
-                SELECT 
-                    e.*,
-                    c.nombres,
-                    c.apellidos,
-                    c.cedula,
-                    c.correo,
-                    c.telefono,
-                    c.ciudad,
-                    c.foto_perfil,
-                    c.id_cliente,
-                    c.fecha_vinculo
-                FROM 
-                    embargos e
-                JOIN 
-                    clientes c ON e.id_cliente = c.id_cliente
-                WHERE 
-                    e.id_embargos = ?
+              SELECT 
+                e.*,
+                c.nombres,
+                c.apellidos,
+                c.cedula,
+                c.correo,
+                c.telefono,
+                c.ciudad,
+                c.foto_perfil,
+                c.id_cliente,
+                c.fecha_vinculo,
+                n.fecha_notificacion,
+                n.observaciones AS observaciones_alarma
+            FROM 
+                embargos e
+            JOIN 
+                clientes c ON e.id_cliente = c.id_cliente
+            LEFT JOIN 
+                notificaciones_embargos n ON e.id_embargos = n.id_embargos
+            WHERE 
+                e.id_embargos = ?;
             `, [id_embargos]);
 
       return rows[0];
