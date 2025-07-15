@@ -164,11 +164,15 @@ const ClienteModel = {
   buscarPorCedula: async (cedula) => {
     const connection = await pool.getConnection();
     try {
-      // Obtener datos del cliente
       const [clienteRows] = await connection.query(
-        'SELECT * FROM clientes WHERE cedula = ?',
+        `SELECT clientes.*, datacredito.nombreData
+          FROM clientes
+          LEFT JOIN datacredito ON clientes.id_cliente = datacredito.id_cliente
+          WHERE clientes.cedula = ?`,
         [cedula]
       );
+
+
 
       if (clienteRows.length === 0) {
         return null;
